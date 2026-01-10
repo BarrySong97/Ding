@@ -1,64 +1,51 @@
-import { IconRefresh, IconFolderPlus, IconUpload, IconSearch, IconList, IconLayoutGrid } from '@tabler/icons-react'
-import { Button } from '@/components/ui/button'
+import { IconSearch, IconCircleCheckFilled, IconCircleXFilled } from '@tabler/icons-react'
 import { Input } from '@/components/ui/input'
 
 interface ToolbarProps {
-  onRefresh?: () => void
-  onNewFolder?: () => void
-  onUpload?: () => void
   searchQuery?: string
   onSearchChange?: (query: string) => void
-  viewMode?: 'list' | 'grid'
-  onViewModeChange?: (mode: 'list' | 'grid') => void
+  storageUsage?: string
+  isConnected?: boolean
 }
 
 export function Toolbar({
-  onRefresh,
-  onNewFolder,
-  onUpload,
   searchQuery = '',
   onSearchChange,
-  viewMode = 'list',
-  onViewModeChange
+  storageUsage,
+  isConnected = false
 }: ToolbarProps) {
   return (
     <div className="flex items-center justify-between border-b border-border bg-background px-6 py-4">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="default" onClick={onRefresh}>
-          <IconRefresh size={18} />
-        </Button>
-        <Button variant="ghost" size="default" onClick={onNewFolder}>
-          <IconFolderPlus size={18} className="mr-2" />
-          New Folder
-        </Button>
-        <Button variant="default" size="default" onClick={onUpload}>
-          <IconUpload size={18} className="mr-2" />
-          Upload
-        </Button>
-
-        {/* View Mode Toggle */}
-        <div className="ml-2 flex items-center rounded-lg border border-border">
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'ghost'}
-            size="default"
-            onClick={() => onViewModeChange?.('list')}
-            className="rounded-r-none border-r-0"
-          >
-            <IconList size={18} />
-          </Button>
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'ghost'}
-            size="default"
-            onClick={() => onViewModeChange?.('grid')}
-            className="rounded-l-none"
-          >
-            <IconLayoutGrid size={18} />
-          </Button>
+      {/* Left: Storage Usage */}
+      <div className="flex items-center gap-4">
+        {storageUsage && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Storage:</span>
+            <span className="font-medium text-foreground">{storageUsage}</span>
+          </div>
+        )}
+        {/* Connected Status */}
+        <div className="flex items-center gap-1.5">
+          {isConnected ? (
+            <>
+              <IconCircleCheckFilled size={16} className="text-green-500" />
+              <span className="text-sm text-green-600">Connected</span>
+            </>
+          ) : (
+            <>
+              <IconCircleXFilled size={16} className="text-red-500" />
+              <span className="text-sm text-red-600">Disconnected</span>
+            </>
+          )}
         </div>
       </div>
 
+      {/* Right: Search Input */}
       <div className="relative w-64">
-        <IconSearch size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <IconSearch
+          size={18}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
         <Input
           placeholder="Search files..."
           value={searchQuery}

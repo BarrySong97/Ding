@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { IconPlus, IconPencil, IconTrash } from '@tabler/icons-react'
-import { useProviders } from '@/contexts/provider-context'
-import { ProviderAvatar } from '@/components/provider/provider-avatar'
+import { useLiveQuery } from '@tanstack/react-db'
+import { IconPlus, IconPencil, IconTrash, IconCloud } from '@tabler/icons-react'
+import { providersCollection, type Provider } from '@renderer/db'
+import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,14 +15,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import type { Provider } from '@/lib/types'
 
 export const Route = createFileRoute('/settings/providers')({
   component: ProvidersSettings
 })
 
 function ProvidersSettings() {
-  const { providers, deleteProvider } = useProviders()
+  const { data: providers } = useLiveQuery((q) => q.from({ provider: providersCollection }))
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null)
 
@@ -33,10 +33,25 @@ function ProvidersSettings() {
 
   const handleDeleteConfirm = () => {
     if (providerToDelete) {
-      deleteProvider(providerToDelete.id)
+      providersCollection.delete(providerToDelete.id)
       setDeleteDialogOpen(false)
       setProviderToDelete(null)
     }
+  }
+
+  const getProviderTypeLabel = (provider: Provider) => {
+    if (provider.type === 's3-compatible') {
+      const labels: Record<string, string> = {
+        'aws-s3': 'AWS S3',
+        'aliyun-oss': 'Aliyun OSS',
+        'tencent-cos': 'Tencent COS',
+        'cloudflare-r2': 'Cloudflare R2',
+        minio: 'MinIO',
+        'backblaze-b2': 'Backblaze B2'
+      }
+      return labels[provider.variant] || provider.variant
+    }
+    return 'Supabase Storage'
   }
 
   return (
@@ -48,16 +63,16 @@ function ProvidersSettings() {
             Manage your cloud storage providers
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setAddDialogOpen(true)}>
           <IconPlus size={18} className="mr-2" />
           Add Provider
         </Button>
       </div>
 
-      {providers.length === 0 ? (
+      {!providers || providers.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/50 p-12 text-center">
           <p className="mb-4 text-muted-foreground">No providers configured</p>
-          <Button>
+          <Button onClick={() => setAddDialogOpen(true)}>
             <IconPlus size={18} className="mr-2" />
             Add Your First Provider
           </Button>
@@ -70,16 +85,16 @@ function ProvidersSettings() {
               className="flex items-center justify-between rounded-lg border border-border bg-card p-4"
             >
               <div className="flex items-center gap-4">
-                <ProviderAvatar type={provider.type} size="sm" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                  <IconCloud size={20} className="text-muted-foreground" />
+                </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{provider.name}</span>
-                    <Badge variant={provider.connected ? 'default' : 'secondary'} className="text-xs">
-                      {provider.connected ? 'Connected' : 'Disconnected'}
-                    </Badge>
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    {provider.bucket} · {provider.region}
+                    {getProviderTypeLabel(provider)}
+                    {provider.bucket && ` · ${provider.bucket}`}
                   </div>
                 </div>
               </div>
@@ -99,6 +114,9 @@ function ProvidersSettings() {
           ))}
         </div>
       )}
+
+      {/* Add Provider Dialog */}
+      <AddProviderDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

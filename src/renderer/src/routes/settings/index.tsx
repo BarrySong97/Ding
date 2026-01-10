@@ -1,12 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useProviders } from '@/contexts/provider-context'
+import { useLiveQuery } from '@tanstack/react-db'
+import { providersCollection } from '@renderer/db'
 
 export const Route = createFileRoute('/settings/')({
   component: SettingsIndex
 })
 
 function SettingsIndex() {
-  const { providers } = useProviders()
+  const { data: providers } = useLiveQuery((q) => q.from({ provider: providersCollection }))
 
   return (
     <div>
@@ -21,7 +22,7 @@ function SettingsIndex() {
             </div>
             <div className="flex justify-between">
               <span>Configured Providers:</span>
-              <span>{providers.length}</span>
+              <span>{providers?.length ?? 0}</span>
             </div>
           </div>
         </div>

@@ -1,18 +1,16 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ProviderProvider } from '@/contexts/provider-context'
 import { Sidebar } from '@/components/layout/sidebar'
 
 export const Route = createRootRoute({
   component: () => (
-    <ProviderProvider>
-      <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
+    <div className="flex  overflow-hidden bg-background  min-h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-auto ">
+        <div className="h-[30px] fixed w-full  draggable"></div>
+        <div className="h-[calc(100vh-30px)]">
           <Outlet />
-        </main>
-        <TanStackRouterDevtools />
-      </div>
-    </ProviderProvider>
+        </div>
+      </main>
+    </div>
   )
 })

@@ -9,6 +9,13 @@ function createWindow(): void {
     width: 900,
     height: 670,
     show: false,
+    titleBarStyle: 'hidden',
+    vibrancy: 'under-window',
+    titleBarOverlay: {
+      color: '#ffffff',
+      height: 32,
+      symbolColor: '#6a7282'
+    },
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {

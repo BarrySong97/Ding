@@ -1,23 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
-import { useProviders } from '@/contexts/provider-context'
-import { mockFiles } from '@/lib/mock-data'
-import type { FileItem, UploadItem } from '@/lib/types'
-import { Toolbar } from '@/components/file-browser/toolbar'
-import { Breadcrumb } from '@/components/file-browser/breadcrumb'
-import { FileList } from '@/components/file-browser/file-list'
-import { FileGrid } from '@/components/file-browser/file-grid'
-import { UploadZone } from '@/components/upload/upload-zone'
-import { UploadQueue } from '@/components/upload/upload-queue'
-import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useLiveQuery, eq } from '@tanstack/react-db'
+import { providersCollection } from '@renderer/db'
+import { Button } from '@/components/ui/button'
 
 export const Route = createFileRoute('/provider/$providerId')({
   component: ProviderDetail
@@ -25,42 +9,11 @@ export const Route = createFileRoute('/provider/$providerId')({
 
 function ProviderDetail() {
   const { providerId } = Route.useParams()
-  const { getProvider, updateProviderBucket } = useProviders()
-  const provider = getProvider(providerId)
-
-  const [selectedBucket, setSelectedBucket] = useState(
-    provider?.selectedBucket || provider?.bucket || ''
+  const { data: providers } = useLiveQuery((q) =>
+    q.from({ provider: providersCollection }).where(({ provider }) => eq(provider.id, providerId))
   )
-  const [currentPath, setCurrentPath] = useState<string[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showUploadZone, setShowUploadZone] = useState(false)
-  const [uploads, setUploads] = useState<UploadItem[]>([])
-  const [showUploadQueue, setShowUploadQueue] = useState(false)
 
-  // View mode state with localStorage persistence
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
-    const stored = localStorage.getItem('oss-file-view-mode')
-    return (stored as 'list' | 'grid') || 'list'
-  })
-
-  useEffect(() => {
-    localStorage.setItem('oss-file-view-mode', viewMode)
-  }, [viewMode])
-
-  // Update selected bucket when provider changes
-  useEffect(() => {
-    if (provider) {
-      setSelectedBucket(provider.selectedBucket || provider.bucket)
-    }
-  }, [provider])
-
-  const handleBucketChange = (bucketName: string) => {
-    setSelectedBucket(bucketName)
-    updateProviderBucket(providerId, bucketName)
-    // Reset path and search when switching buckets
-    setCurrentPath([])
-    setSearchQuery('')
-  }
+  const provider = providers?.[0]
 
   if (!provider) {
     return (
@@ -75,117 +28,19 @@ function ProviderDetail() {
     )
   }
 
-  // Get files for current provider and selected bucket
-  const allFiles = mockFiles[providerId]?.[selectedBucket] || []
-  const filteredFiles = searchQuery
-    ? allFiles.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : allFiles
-
-  const handleFileClick = (file: FileItem) => {
-    if (file.type === 'folder') {
-      setCurrentPath([...currentPath, file.name])
+  const getProviderTypeLabel = () => {
+    if (provider.type === 's3-compatible') {
+      const labels: Record<string, string> = {
+        'aws-s3': 'AWS S3',
+        'aliyun-oss': 'Aliyun OSS',
+        'tencent-cos': 'Tencent COS',
+        'cloudflare-r2': 'Cloudflare R2',
+        minio: 'MinIO',
+        'backblaze-b2': 'Backblaze B2'
+      }
+      return labels[provider.variant] || provider.variant
     }
-  }
-
-  const handleNavigate = (index: number) => {
-    if (index === -1) {
-      setCurrentPath([])
-    } else {
-      setCurrentPath(currentPath.slice(0, index + 1))
-    }
-  }
-
-  const handleRefresh = () => {
-    console.log('Refresh files')
-  }
-
-  const handleNewFolder = () => {
-    console.log('Create new folder')
-  }
-
-  const handleUpload = () => {
-    setShowUploadZone(!showUploadZone)
-  }
-
-  const handleFilesSelected = (files: File[]) => {
-    const newUploads: UploadItem[] = files.map((file) => ({
-      id: Date.now().toString() + Math.random(),
-      file,
-      name: file.name,
-      size: file.size,
-      progress: 0,
-      status: 'pending'
-    }))
-
-    setUploads((prev) => [...prev, ...newUploads])
-    setShowUploadQueue(true)
-    setShowUploadZone(false)
-
-    // Simulate upload progress
-    newUploads.forEach((upload) => {
-      simulateUpload(upload.id)
-    })
-  }
-
-  const simulateUpload = (uploadId: string) => {
-    setUploads((prev) =>
-      prev.map((u) => (u.id === uploadId ? { ...u, status: 'uploading' as const } : u))
-    )
-
-    const interval = setInterval(() => {
-      setUploads((prev) => {
-        const upload = prev.find((u) => u.id === uploadId)
-        if (!upload || upload.status !== 'uploading') {
-          clearInterval(interval)
-          return prev
-        }
-
-        const newProgress = Math.min(upload.progress + 10, 100)
-        if (newProgress === 100) {
-          clearInterval(interval)
-          return prev.map((u) =>
-            u.id === uploadId ? { ...u, progress: 100, status: 'completed' as const } : u
-          )
-        }
-
-        return prev.map((u) => (u.id === uploadId ? { ...u, progress: newProgress } : u))
-      })
-    }, 500)
-  }
-
-  const handlePauseUpload = (id: string) => {
-    setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, status: 'paused' as const } : u)))
-  }
-
-  const handleResumeUpload = (id: string) => {
-    simulateUpload(id)
-  }
-
-  const handleCancelUpload = (id: string) => {
-    setUploads((prev) => prev.filter((u) => u.id !== id))
-  }
-
-  const handleClearCompleted = () => {
-    setUploads((prev) => prev.filter((u) => u.status !== 'completed'))
-  }
-
-  const handleDownload = (file: FileItem) => {
-    console.log('Download file:', file.name)
-  }
-
-  const handleDelete = (file: FileItem) => {
-    console.log('Delete file:', file.name)
-  }
-
-  const handleCopyUrl = (file: FileItem) => {
-    if (file.url) {
-      navigator.clipboard.writeText(file.url)
-      console.log('Copied URL:', file.url)
-    }
-  }
-
-  const handleRename = (file: FileItem) => {
-    console.log('Rename file:', file.name)
+    return 'Supabase Storage'
   }
 
   return (
@@ -193,84 +48,59 @@ function ProviderDetail() {
       {/* Header */}
       <div className="border-b border-border bg-background px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex flex-col gap-2">
-            <Select defaultValue={selectedBucket} onValueChange={handleBucketChange}>
-              <SelectTrigger id="bucket-selector" size="sm" className="w-fit min-w-[120px]">
-                <SelectValue placeholder="Select bucket" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {provider.buckets?.map((bucket) => (
-                    <SelectItem key={bucket} value={bucket}>
-                      {bucket}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <span className="text-sm text-muted-foreground">{provider.region}</span>
-          </div>
-          <div className="flex flex-col items-end gap-2">
+          <div>
             <h1 className="text-2xl font-bold">{provider.name}</h1>
-            <Badge variant={provider.connected ? 'default' : 'secondary'}>
-              {provider.connected ? 'Connected' : 'Disconnected'}
-            </Badge>
+            <p className="mt-1 text-sm text-muted-foreground">{getProviderTypeLabel()}</p>
           </div>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <Toolbar
-        onRefresh={handleRefresh}
-        onNewFolder={handleNewFolder}
-        onUpload={handleUpload}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-      />
-
-      {/* Breadcrumb */}
-      <Breadcrumb path={currentPath} onNavigate={handleNavigate} />
-
-      {/* File List */}
-      <div className="flex-1 overflow-auto">
-        {showUploadZone ? (
-          <div className="p-8">
-            <UploadZone onFilesSelected={handleFilesSelected} />
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="rounded-lg border border-border bg-card p-6">
+          <h2 className="mb-4 text-lg font-semibold">Provider Details</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Type:</span>
+              <span>{getProviderTypeLabel()}</span>
+            </div>
+            {provider.type === 's3-compatible' && (
+              <>
+                {provider.region && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Region:</span>
+                    <span>{provider.region}</span>
+                  </div>
+                )}
+                {provider.endpoint && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Endpoint:</span>
+                    <span>{provider.endpoint}</span>
+                  </div>
+                )}
+              </>
+            )}
+            {provider.type === 'supabase-storage' && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Project URL:</span>
+                <span>{provider.projectUrl}</span>
+              </div>
+            )}
+            {provider.bucket && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Bucket:</span>
+                <span>{provider.bucket}</span>
+              </div>
+            )}
           </div>
-        ) : viewMode === 'list' ? (
-          <FileList
-            files={filteredFiles}
-            onFileClick={handleFileClick}
-            onDownload={handleDownload}
-            onDelete={handleDelete}
-            onCopyUrl={handleCopyUrl}
-            onRename={handleRename}
-          />
-        ) : (
-          <FileGrid
-            files={filteredFiles}
-            onFileClick={handleFileClick}
-            onDownload={handleDownload}
-            onDelete={handleDelete}
-            onCopyUrl={handleCopyUrl}
-            onRename={handleRename}
-          />
-        )}
-      </div>
+        </div>
 
-      {/* Upload Queue */}
-      {showUploadQueue && uploads.length > 0 && (
-        <UploadQueue
-          uploads={uploads}
-          onPause={handlePauseUpload}
-          onResume={handleResumeUpload}
-          onCancel={handleCancelUpload}
-          onClearCompleted={handleClearCompleted}
-          onClose={() => setShowUploadQueue(false)}
-        />
-      )}
+        <div className="mt-6 rounded-lg border border-dashed border-border bg-muted/50 p-12 text-center">
+          <p className="text-muted-foreground">
+            File browser coming soon...
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

@@ -59,22 +59,22 @@ export function FileList({
               key={file.id}
               className="border-b border-border transition-colors hover:bg-muted/50"
             >
-              <td className="px-6 py-4">
+              <td className="px-6 py-2">
                 <button
                   onClick={() => onFileClick(file)}
                   className="flex items-center gap-3 text-left"
                 >
                   {getFileIcon(file, 'small')}
-                  <span className="font-medium">{file.name}</span>
+                  <span className="font-medium text-sm">{file.name}</span>
                 </button>
               </td>
               <td className="px-6 py-4 text-sm text-muted-foreground">
                 {file.type === 'folder' ? '-' : formatFileSize(file.size || 0)}
               </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">
+              <td className="px-6 py-2 text-sm text-muted-foreground">
                 {format(file.modified, 'MMM d, yyyy')}
               </td>
-              <td className="px-6 py-4 text-right">
+              <td className="px-6 py-2 text-right">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="default">
@@ -95,10 +95,7 @@ export function FileList({
                     )}
                     <DropdownMenuItem onClick={() => onRename?.(file)}>Rename</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => onDelete?.(file)}
-                      variant="destructive"
-                    >
+                    <DropdownMenuItem onClick={() => onDelete?.(file)} variant="destructive">
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>

@@ -135,6 +135,13 @@ Use the shadcn CLI to add more components:
 pnpm dlx shadcn@latest add [component-name]
 ```
 
+### Installing Dependencies
+
+All frontend dependencies (React components, UI libraries, etc.) should be installed as devDependencies:
+```bash
+pnpm add -D [package-name]
+```
+
 ### Styling
 
 - **Tailwind CSS v4** with Vite plugin
