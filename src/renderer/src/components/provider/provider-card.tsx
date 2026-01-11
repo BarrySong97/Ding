@@ -1,17 +1,7 @@
 import { Link } from '@tanstack/react-router'
-import {
-  IconArrowRight,
-  IconBucket,
-  IconRefresh,
-  IconCloud,
-  IconBrandAws,
-  IconServer
-} from '@tabler/icons-react'
+import { IconChevronRight, IconCloud, IconBrandAws, IconServer } from '@tabler/icons-react'
 import type { TRPCProvider } from '@renderer/lib/trpc'
 import { useProviderStatus } from '@renderer/hooks/use-provider-status'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 interface ProviderCardProps {
@@ -25,6 +15,16 @@ const variantLabels: Record<string, string> = {
   'cloudflare-r2': 'Cloudflare R2',
   minio: 'MinIO',
   'backblaze-b2': 'Backblaze B2'
+}
+
+// Mock usage data since API doesn't provide this
+const mockUsage: Record<string, string> = {
+  'cloudflare-r2': '45.2 GB',
+  'aws-s3': '1.2 TB',
+  'aliyun-oss': '320 GB',
+  'tencent-cos': '180 GB',
+  minio: '25 GB',
+  'backblaze-b2': '500 GB'
 }
 
 function getProviderIcon(provider: TRPCProvider) {
@@ -42,6 +42,27 @@ function getProviderIcon(provider: TRPCProvider) {
   }
 }
 
+function getProviderIconBgColor(provider: TRPCProvider): string {
+  if (provider.type === 'supabase-storage') {
+    return 'bg-emerald-100 text-emerald-600'
+  }
+
+  switch (provider.variant) {
+    case 'aws-s3':
+      return 'bg-orange-100 text-orange-600'
+    case 'cloudflare-r2':
+      return 'bg-orange-50 text-orange-500'
+    case 'aliyun-oss':
+      return 'bg-orange-100 text-orange-600'
+    case 'tencent-cos':
+      return 'bg-blue-100 text-blue-600'
+    case 'minio':
+      return 'bg-red-100 text-red-600'
+    default:
+      return 'bg-muted text-muted-foreground'
+  }
+}
+
 function getProviderTypeLabel(provider: TRPCProvider): string {
   if (provider.type === 'supabase-storage') {
     return 'Supabase Storage'
@@ -50,70 +71,73 @@ function getProviderTypeLabel(provider: TRPCProvider): string {
 }
 
 export function ProviderCard({ provider }: ProviderCardProps) {
-  const { isLoading, isConnected, error, stats, refresh } = useProviderStatus(provider)
+  const { isLoading, isConnected, stats } = useProviderStatus(provider)
 
   const region =
     provider.type === 's3-compatible' ? provider.region : new URL(provider.projectUrl).hostname
 
+  const usage = provider.type === 's3-compatible' ? mockUsage[provider.variant] || '0 GB' : '0 GB'
+
+  const statusText = isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Paused'
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
+    <Link to="/provider/$providerId" params={{ providerId: provider.id }} className="block">
+      <div className="rounded-md border border-border bg-white dark:bg-[#1E1E1E] p-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted">
+            <div
+              className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-lg',
+                getProviderIconBgColor(provider)
+              )}
+            >
               {getProviderIcon(provider)}
             </div>
             <div>
-              <CardTitle className="flex items-center gap-2">
-                {provider.name}
+              <div className="font-medium">{getProviderTypeLabel(provider)}</div>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <span
                   className={cn(
-                    'inline-block h-2 w-2 rounded-full',
-                    isLoading ? 'bg-yellow-500 animate-pulse' : isConnected ? 'bg-green-500' : 'bg-red-500'
+                    'inline-block h-1.5 w-1.5 rounded-full',
+                    isLoading
+                      ? 'bg-yellow-500 animate-pulse'
+                      : isConnected
+                        ? 'bg-green-500'
+                        : 'bg-muted-foreground'
                   )}
                 />
-              </CardTitle>
-              <CardDescription className="mt-1">
-                {getProviderTypeLabel(provider)}
-                {region && ` · ${region}`}
-              </CardDescription>
+                <span>{statusText}</span>
+              </div>
             </div>
           </div>
-          <Badge
-            variant={isConnected ? 'default' : 'secondary'}
-            className={isConnected ? 'bg-green-500 text-white' : ''}
-          >
-            {isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Disconnected'}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between">
-          <div className="flex gap-6">
-            {isLoading ? (
-              <span className="text-sm text-muted-foreground">Loading...</span>
-            ) : error ? (
-              <span className="text-sm text-destructive">{error}</span>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <IconBucket size={16} />
-                <span>{stats?.bucketCount ?? 0} buckets</span>
-              </div>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            {region && (
+              <span className="rounded bg-muted px-2 py-0.5 text-xs font-mono">{region}</span>
             )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={refresh} disabled={isLoading}>
-              <IconRefresh size={16} className={cn(isLoading && 'animate-spin')} />
-            </Button>
-            <Link to="/provider/$providerId" params={{ providerId: provider.id }}>
-              <Button variant="ghost" size="default">
-                Open
-                <IconArrowRight size={16} className="ml-1" />
-              </Button>
-            </Link>
+            <IconChevronRight size={16} />
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Divider */}
+        <div className="my-8 h-px bg-border/50" />
+
+        {/* Stats */}
+        <div className="flex gap-8">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Buckets
+            </div>
+            <div className="mt-0.5 text-lg font-semibold">{stats?.bucketCount ?? 0}</div>
+          </div>
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Usage
+            </div>
+            <div className="mt-0.5 text-lg font-semibold">{usage}</div>
+          </div>
+        </div>
+      </div>
+    </Link>
   )
 }

@@ -1,17 +1,34 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { IconPlus } from '@tabler/icons-react'
+import {
+  IconPlus,
+  IconDatabase,
+  IconFolder,
+  IconArrowsDownUp,
+  IconCloud
+} from '@tabler/icons-react'
 import { type S3Variant } from '@renderer/db'
 import { EmptyState } from '@/components/provider/empty-state'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { ProviderCard } from '@/components/provider/provider-card'
+import { AddProviderCard } from '@/components/provider/add-provider-card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { trpc } from '@renderer/lib/trpc'
 import { Skeleton } from '@/components/ui/skeleton'
+import { StatCard } from '@/components/dashboard/status-card'
 
 export const Route = createFileRoute('/')({
   component: Index
 })
+
+// Mock dashboard statistics
+const dashboardStats = {
+  totalStorage: { value: '1.84 TB', trend: '+12.5% this month' },
+  activeBuckets: { value: '17', subtitle: 'Across 3 providers' },
+  requests: { value: '84.2K', subtitle: '62MB Bandwidth' },
+  providers: { active: 2, total: 3, status: 'Systems operational' }
+}
 
 function Index() {
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -75,9 +92,9 @@ function Index() {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">OSS Upload Client</h1>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
             <p className="mt-2 text-muted-foreground">
-              Manage your cloud storage providers and files
+              Manage all your object storage providers in one place.
             </p>
           </div>
           <Button onClick={() => handleAddProvider()}>
@@ -86,13 +103,47 @@ function Index() {
           </Button>
         </div>
 
-        {/* Providers Grid */}
+        {/* Stats Grid */}
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Storage"
+            value={dashboardStats.totalStorage.value}
+            icon={<IconDatabase size={20} />}
+            trend={{ value: dashboardStats.totalStorage.trend, positive: true }}
+          />
+          <StatCard
+            title="Active Buckets"
+            value={dashboardStats.activeBuckets.value}
+            icon={<IconFolder size={20} />}
+            subtitle={dashboardStats.activeBuckets.subtitle}
+          />
+          <StatCard
+            title="Requests (24h)"
+            value={dashboardStats.requests.value}
+            icon={<IconArrowsDownUp size={20} />}
+            subtitle={dashboardStats.requests.subtitle}
+          />
+          <StatCard
+            title="Providers"
+            value={`${dashboardStats.providers.active}/${dashboardStats.providers.total}`}
+            icon={<IconCloud size={20} />}
+            status={{ label: dashboardStats.providers.status, active: true }}
+          />
+        </div>
+
+        {/* Connected Providers */}
         <div>
-          <h2 className="mb-4 text-xl font-semibold">Your Providers</h2>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="mb-4 flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Connected Providers</h2>
+            <Badge variant="secondary" className="rounded-full">
+              {providers.length}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {providers.map((provider) => (
               <ProviderCard key={provider.id} provider={provider} />
             ))}
+            <AddProviderCard onClick={() => handleAddProvider()} />
           </div>
         </div>
       </div>
