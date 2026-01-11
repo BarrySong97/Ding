@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react'
 import {
-  IconArrowLeft,
   IconRefresh,
   IconLoader2,
   IconFolder,
@@ -12,7 +11,6 @@ import {
   IconCheckbox
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
-import { Breadcrumb } from '@renderer/components/file-browser/breadcrumb'
 import { FileList } from '@renderer/components/file-browser/file-list'
 import { BatchToolbar } from '@renderer/components/file-browser/batch-toolbar'
 import { UploadDialog } from '@renderer/components/provider/upload-dialog'
@@ -44,11 +42,11 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { FileItem } from '@/lib/types'
+import { useNavigationStore } from '@renderer/stores/navigation-store'
 
 interface BucketBrowserProps {
   provider: TRPCProvider
   bucket: string
-  onBack: () => void
 }
 
 function FileListSkeleton() {
@@ -93,8 +91,10 @@ function FileListSkeleton() {
   )
 }
 
-export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) {
-  const [path, setPath] = useState<string[]>([])
+export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
+  // Use navigation store for path management
+  const { currentPath: path, setPath } = useNavigationStore()
+
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([])
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
@@ -155,19 +155,6 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
     const query = searchQuery.toLowerCase()
     return files.filter((file) => file.name.toLowerCase().includes(query))
   }, [files, searchQuery])
-
-  const handleNavigate = (index: number) => {
-    if (index === -1) {
-      // Home button clicked - go to bucket root (clear path)
-      setPath([])
-    } else {
-      // Navigate to specific path segment
-      setPath(path.slice(0, index + 1))
-    }
-    // Reset pagination when navigating
-    setCursor(undefined)
-    setCursorHistory([])
-  }
 
   const handleFileClick = (file: FileItem) => {
     if (file.type === 'folder') {
@@ -324,14 +311,6 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border bg-background px-6 py-3">
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2">
-          <IconArrowLeft size={16} />
-        </Button>
-        <span className="font-medium">{bucket}</span>
-      </div>
-
       {/* Toolbar */}
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-6 py-2">
         <Button
@@ -382,9 +361,6 @@ export function BucketBrowser({ provider, bucket, onBack }: BucketBrowserProps) 
           <IconRefresh size={16} className={cn(showLoading && 'animate-spin')} />
         </Button>
       </div>
-
-      {/* Breadcrumb */}
-      <Breadcrumb path={path} onNavigate={handleNavigate} />
 
       {/* Batch Toolbar */}
       {selectionMode && (

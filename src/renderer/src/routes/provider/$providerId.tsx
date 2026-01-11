@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   IconRefresh,
@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { CreateBucketDialog } from '@renderer/components/provider/create-bucket-dialog'
+import { useNavigationStore } from '@renderer/stores/navigation-store'
 
 export const Route = createFileRoute('/provider/$providerId')({
   component: ProviderDetail
@@ -153,19 +154,32 @@ function getProviderEndpoint(provider: TRPCProvider): string | null {
 
 function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const { isLoading, isConnected, error, stats, refresh } = useProviderStatus(provider)
-  const [currentBucket, setCurrentBucket] = useState<string | null>(null)
   const [createBucketOpen, setCreateBucketOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // Navigation store
+  const { currentBucket, setProvider, setBucket, reset } = useNavigationStore()
+
+  // Set provider info when component mounts or provider changes
+  useEffect(() => {
+    const variant = provider.type === 's3-compatible' ? provider.variant : undefined
+    setProvider({
+      id: provider.id,
+      name: provider.name,
+      variant
+    })
+
+    // Reset navigation state when leaving the page
+    return () => {
+      reset()
+    }
+  }, [provider.id, provider.name, provider.type, setProvider, reset])
 
   const endpoint = getProviderEndpoint(provider)
   const region = provider.type === 's3-compatible' ? provider.region : null
 
   const handleBucketClick = (bucket: BucketInfo) => {
-    setCurrentBucket(bucket.name)
-  }
-
-  const handleBackToBuckets = () => {
-    setCurrentBucket(null)
+    setBucket(bucket.name)
   }
 
   const handleCopyEndpoint = async () => {
@@ -183,7 +197,7 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
 
   // Show bucket browser when a bucket is selected
   if (currentBucket) {
-    return <BucketBrowser provider={provider} bucket={currentBucket} onBack={handleBackToBuckets} />
+    return <BucketBrowser provider={provider} bucket={currentBucket} />
   }
 
   return (

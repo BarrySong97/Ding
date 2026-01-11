@@ -1,140 +1,231 @@
-import { Link, useRouterState, useParams } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import {
   IconLayoutDashboard,
   IconSettings,
   IconCloud,
   IconBrandAws,
-  IconFolder
+  IconFolder,
+  IconFolderOpen
 } from '@tabler/icons-react'
 import {
   Breadcrumb,
   BreadcrumbList,
   BreadcrumbItem,
   BreadcrumbLink,
-  BreadcrumbSeparator,
-  BreadcrumbPage
+  BreadcrumbSeparator
 } from '@/components/ui/breadcrumb'
-import { trpc } from '@renderer/lib/trpc'
+import { useNavigationStore } from '@renderer/stores/navigation-store'
+
+// 路由配置 - 易于维护和扩展
+interface RouteConfig {
+  path: string
+  label: string
+  icon?: React.ComponentType<{ size?: number }>
+}
+
+const routeConfigs: RouteConfig[] = [
+  { path: '/', label: 'Dashboard', icon: IconLayoutDashboard },
+  { path: '/settings', label: 'Settings', icon: IconSettings },
+  { path: '/settings/providers', label: 'Providers', icon: IconFolder },
+  { path: '/settings/compression', label: 'Image Compression' }
+]
 
 // Provider icon based on variant
-function getProviderIcon(variant?: string, size: number = 16) {
+function getProviderIcon(variant?: string) {
   if (variant === 'aws-s3') {
-    return <IconBrandAws size={size} />
+    return IconBrandAws
   }
-  return <IconCloud size={size} />
+  return IconCloud
 }
+
+// 面包屑项样式
+const linkStyle =
+  'flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white transition-colors no-draggable cursor-pointer px-2 py-0.5 rounded-md'
+const badgeStyle =
+  'flex items-center gap-2 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-200 dark:border-gray-700 no-draggable cursor-pointer hover:bg-accent/20 transition-colors'
+const activeTextStyle = 'text-gray-900 dark:text-white'
 
 export function Header() {
   const router = useRouterState()
   const currentPath = router.location.pathname
 
-  // Get provider ID from URL if on provider page
-  const params = useParams({ strict: false }) as { providerId?: string }
-  const providerId = params.providerId
+  const {
+    currentProvider,
+    currentBucket,
+    currentPath: folderPath,
+    navigateToFolder
+  } = useNavigationStore()
 
-  // Fetch provider data if on provider page
-  const { data: provider } = trpc.provider.getById.useQuery(
-    { id: providerId! },
-    { enabled: !!providerId }
-  )
+  // 查找当前路由配置
+  const findRouteConfig = (path: string): RouteConfig | undefined => {
+    return routeConfigs.find((r) => r.path === path)
+  }
 
-  const renderBreadcrumb = () => {
-    // Dashboard
-    if (currentPath === '/') {
-      return (
-        <BreadcrumbItem>
-          <BreadcrumbPage className="flex items-center gap-2">
-            <IconLayoutDashboard size={16} />
-            <span>Dashboard</span>
-          </BreadcrumbPage>
-        </BreadcrumbItem>
-      )
+  // 生成面包屑项
+  const renderBreadcrumbs = () => {
+    const items: React.ReactNode[] = []
+
+    // 1. Dashboard - 不显示任何内容
+    const dashboardConfig = findRouteConfig('/')
+    const isOnDashboard = currentPath === '/'
+
+    if (isOnDashboard) {
+      // Dashboard 页面不显示面包屑
+      return items
     }
 
-    // Provider page
-    if (currentPath.startsWith('/provider/') && provider) {
-      const variant = provider.type === 's3-compatible' ? provider.variant : undefined
-      return (
-        <BreadcrumbItem>
-          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-2 py-0.5 rounded shadow-sm border border-gray-200 dark:border-gray-700">
-            <span className="text-gray-500">{getProviderIcon(variant)}</span>
-            <span className="font-semibold text-gray-900 dark:text-white">{provider.name}</span>
-          </div>
-        </BreadcrumbItem>
-      )
-    }
+    // Dashboard 作为链接
+    items.push(
+      <BreadcrumbItem key="dashboard">
+        <BreadcrumbLink asChild>
+          <Link to="/" className={linkStyle}>
+            {dashboardConfig?.icon && <dashboardConfig.icon size={16} />}
+            <span>{dashboardConfig?.label}</span>
+          </Link>
+        </BreadcrumbLink>
+      </BreadcrumbItem>
+    )
 
-    // Settings pages
+    // 2. Settings 页面
     if (currentPath.startsWith('/settings')) {
-      // Settings root only
-      if (currentPath === '/settings') {
-        return (
-          <BreadcrumbItem>
-            <BreadcrumbPage className="flex items-center gap-2">
-              <IconSettings size={16} />
-              <span>Settings</span>
-            </BreadcrumbPage>
+      const settingsConfig = findRouteConfig('/settings')
+      const isOnSettings = currentPath === '/settings'
+
+      items.push(<BreadcrumbSeparator key="sep-settings" />)
+
+      if (isOnSettings) {
+        items.push(
+          <BreadcrumbItem key="settings">
+            <div className={badgeStyle}>
+              {settingsConfig?.icon && <settingsConfig.icon size={16} />}
+              <span className={activeTextStyle}>{settingsConfig?.label}</span>
+            </div>
           </BreadcrumbItem>
         )
-      }
+      } else {
+        items.push(
+          <BreadcrumbItem key="settings">
+            <BreadcrumbLink asChild>
+              <Link to="/settings" className={linkStyle}>
+                {settingsConfig?.icon && <settingsConfig.icon size={16} />}
+                <span>{settingsConfig?.label}</span>
+              </Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+        )
 
-      // Settings sub-pages
-      if (currentPath === '/settings/providers') {
-        return (
-          <>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/settings" className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
-                  <IconSettings size={16} />
-                  <span>Settings</span>
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-2 py-0.5 rounded shadow-sm border border-gray-200 dark:border-gray-700">
-                <IconFolder size={16} className="text-gray-500" />
-                <span className="font-semibold text-gray-900 dark:text-white">Providers</span>
+        // Settings 子页面
+        const subConfig = findRouteConfig(currentPath)
+        if (subConfig) {
+          items.push(<BreadcrumbSeparator key="sep-sub" />)
+          items.push(
+            <BreadcrumbItem key="sub">
+              <div className={badgeStyle}>
+                {subConfig.icon && <subConfig.icon size={16} />}
+                <span className={activeTextStyle}>{subConfig.label}</span>
               </div>
             </BreadcrumbItem>
-          </>
-        )
+          )
+        }
       }
 
-      if (currentPath === '/settings/compression') {
-        return (
-          <>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link to="/settings" className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
-                  <IconSettings size={16} />
-                  <span>Settings</span>
-                </Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-2 py-0.5 rounded shadow-sm border border-gray-200 dark:border-gray-700">
-                <span className="font-semibold text-gray-900 dark:text-white">Image Compression</span>
-              </div>
-            </BreadcrumbItem>
-          </>
-        )
-      }
-
-      return null
+      return items
     }
 
-    // Default fallback
-    return null
+    // 3. Provider 页面
+    if (currentPath.startsWith('/provider/') && currentProvider) {
+      const ProviderIcon = getProviderIcon(currentProvider.variant)
+      const isLastItem = !currentBucket
+
+      items.push(<BreadcrumbSeparator key="sep-provider" />)
+
+      if (isLastItem) {
+        // Provider 是当前页面（没有选中 bucket）
+        items.push(
+          <BreadcrumbItem key="provider">
+            <div className={badgeStyle}>
+              <ProviderIcon size={16} />
+              <span className={activeTextStyle}>{currentProvider.name}</span>
+            </div>
+          </BreadcrumbItem>
+        )
+      } else {
+        // Provider 作为链接（已选中 bucket）
+        items.push(
+          <BreadcrumbItem key="provider">
+            <button
+              onClick={() => {
+                useNavigationStore.getState().setBucket(null)
+              }}
+              className={linkStyle}
+            >
+              <ProviderIcon size={16} />
+              <span>{currentProvider.name}</span>
+            </button>
+          </BreadcrumbItem>
+        )
+
+        // 4. Bucket
+        items.push(<BreadcrumbSeparator key="sep-bucket" />)
+        const isBucketLast = folderPath.length === 0
+
+        if (isBucketLast) {
+          items.push(
+            <BreadcrumbItem key="bucket">
+              <div className={badgeStyle}>
+                <IconFolderOpen size={16} />
+                <span className={activeTextStyle}>{currentBucket}</span>
+              </div>
+            </BreadcrumbItem>
+          )
+        } else {
+          items.push(
+            <BreadcrumbItem key="bucket">
+              <button onClick={() => navigateToFolder(-1)} className={linkStyle}>
+                <IconFolderOpen size={16} />
+                <span>{currentBucket}</span>
+              </button>
+            </BreadcrumbItem>
+          )
+
+          // 5. Folder path
+          folderPath.forEach((folder, index) => {
+            const isLast = index === folderPath.length - 1
+            items.push(<BreadcrumbSeparator key={`sep-folder-${index}`} />)
+
+            if (isLast) {
+              items.push(
+                <BreadcrumbItem key={`folder-${index}`}>
+                  <div className={badgeStyle}>
+                    <IconFolder size={16} />
+                    <span className={activeTextStyle}>{folder}</span>
+                  </div>
+                </BreadcrumbItem>
+              )
+            } else {
+              items.push(
+                <BreadcrumbItem key={`folder-${index}`}>
+                  <button onClick={() => navigateToFolder(index)} className={linkStyle}>
+                    <IconFolder size={16} />
+                    <span>{folder}</span>
+                  </button>
+                </BreadcrumbItem>
+              )
+            }
+          })
+        }
+      }
+
+      return items
+    }
+
+    return items
   }
 
   return (
-    <header className="h-12 px-4 pr-[140px] flex items-center shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable">
+    <header className="h-12 pl-0 pr-[140px] flex items-center shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable">
       <Breadcrumb>
-        <BreadcrumbList>
-          {renderBreadcrumb()}
-        </BreadcrumbList>
+        <BreadcrumbList>{renderBreadcrumbs()}</BreadcrumbList>
       </Breadcrumb>
     </header>
   )
