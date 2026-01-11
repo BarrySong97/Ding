@@ -12,7 +12,8 @@ import {
   deleteObjectsInputSchema,
   renameObjectInputSchema,
   moveObjectInputSchema,
-  moveObjectsInputSchema
+  moveObjectsInputSchema,
+  createBucketInputSchema
 } from '../../../shared/schema/trpc/provider'
 import {
   testConnection,
@@ -25,7 +26,8 @@ import {
   deleteObjects,
   renameObject,
   moveObject,
-  moveObjects
+  moveObjects,
+  createBucket
 } from '../../services/provider-service'
 import { providerRepository } from '../../db/provider-repository'
 
@@ -49,6 +51,32 @@ export const providerRouter = router({
     return providerRepository.delete(input.id)
   }),
 
+  // ============ Global Statistics ============
+  getGlobalStats: publicProcedure.query(async () => {
+    const providers = await providerRepository.findAll()
+    const uniqueRegions = new Set<string>()
+    let totalBuckets = 0
+
+    for (const provider of providers) {
+      try {
+        const stats = await getProviderStats(provider)
+        totalBuckets += stats.bucketCount
+      } catch {
+        // Skip providers that fail to connect
+      }
+
+      if (provider.type === 's3-compatible' && provider.region) {
+        uniqueRegions.add(provider.region)
+      }
+    }
+
+    return {
+      providersCount: providers.length,
+      bucketsCount: totalBuckets,
+      regionsCount: uniqueRegions.size
+    }
+  }),
+
   // ============ Provider Operations ============
   testConnection: publicProcedure.input(providerSchema).query(async ({ input }) => {
     return testConnection(input)
@@ -63,11 +91,15 @@ export const providerRouter = router({
   }),
 
   uploadFile: publicProcedure.input(uploadFileInputSchema).mutation(async ({ input }) => {
-    return uploadFile(input)
+    const result = await uploadFile(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
   }),
 
   createFolder: publicProcedure.input(createFolderInputSchema).mutation(async ({ input }) => {
-    return createFolder(input)
+    const result = await createFolder(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
   }),
 
   getObjectUrl: publicProcedure.input(getObjectUrlInputSchema).query(async ({ input }) => {
@@ -75,22 +107,38 @@ export const providerRouter = router({
   }),
 
   deleteObject: publicProcedure.input(deleteObjectInputSchema).mutation(async ({ input }) => {
-    return deleteObject(input)
+    const result = await deleteObject(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
   }),
 
   deleteObjects: publicProcedure.input(deleteObjectsInputSchema).mutation(async ({ input }) => {
-    return deleteObjects(input)
+    const result = await deleteObjects(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
   }),
 
   renameObject: publicProcedure.input(renameObjectInputSchema).mutation(async ({ input }) => {
-    return renameObject(input)
+    const result = await renameObject(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
   }),
 
   moveObject: publicProcedure.input(moveObjectInputSchema).mutation(async ({ input }) => {
-    return moveObject(input)
+    const result = await moveObject(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
   }),
 
   moveObjects: publicProcedure.input(moveObjectsInputSchema).mutation(async ({ input }) => {
-    return moveObjects(input)
+    const result = await moveObjects(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
+  }),
+
+  createBucket: publicProcedure.input(createBucketInputSchema).mutation(async ({ input }) => {
+    const result = await createBucket(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
   })
 })

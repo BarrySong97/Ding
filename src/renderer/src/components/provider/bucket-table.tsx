@@ -6,7 +6,7 @@ import {
   getPaginationRowModel,
   useReactTable
 } from '@tanstack/react-table'
-import { IconBucket } from '@tabler/icons-react'
+import { IconFolder, IconTrash } from '@tabler/icons-react'
 import {
   Table,
   TableBody,
@@ -16,14 +16,7 @@ import {
   TableRow
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination'
+import { Button } from '@/components/ui/button'
 
 export interface BucketInfo {
   name: string
@@ -33,6 +26,7 @@ export interface BucketInfo {
 interface BucketTableProps {
   buckets: BucketInfo[]
   onBucketClick?: (bucket: BucketInfo) => void
+  onBucketDelete?: (bucket: BucketInfo) => void
   pageSize?: number
 }
 
@@ -42,8 +36,9 @@ export function BucketTableSkeleton() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead className="w-1/2">BUCKET NAME</TableHead>
+            <TableHead>CREATED DATE</TableHead>
+            <TableHead className="w-32 text-right">ACTIONS</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -58,6 +53,9 @@ export function BucketTableSkeleton() {
               <TableCell>
                 <Skeleton className="h-4 w-24" />
               </TableCell>
+              <TableCell className="text-right">
+                <Skeleton className="ml-auto h-4 w-20" />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -66,7 +64,12 @@ export function BucketTableSkeleton() {
   )
 }
 
-export function BucketTable({ buckets, onBucketClick, pageSize = 10 }: BucketTableProps) {
+export function BucketTable({
+  buckets,
+  onBucketClick,
+  onBucketDelete,
+  pageSize = 10
+}: BucketTableProps) {
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize
@@ -75,26 +78,60 @@ export function BucketTable({ buckets, onBucketClick, pageSize = 10 }: BucketTab
   const columns: ColumnDef<BucketInfo>[] = [
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: 'BUCKET NAME',
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <IconBucket size={16} className="text-muted-foreground" />
+        <div className="flex items-center gap-3">
+          <IconFolder size={16} className="text-muted-foreground" />
           <span className="font-medium">{row.getValue('name')}</span>
         </div>
       )
     },
     {
       accessorKey: 'creationDate',
-      header: 'Created',
+      header: 'CREATED DATE',
       cell: ({ row }) => {
         const date = row.getValue('creationDate') as string | undefined
         if (!date) return <span className="text-muted-foreground">—</span>
         return (
           <span className="text-muted-foreground">
-            {new Date(date).toLocaleDateString()}
+            {new Date(date).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })}
           </span>
         )
       }
+    },
+    {
+      id: 'actions',
+      header: () => <div className="text-right">ACTIONS</div>,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
+            onClick={(e) => {
+              e.stopPropagation()
+              onBucketClick?.(row.original)
+            }}
+          >
+            Explore
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+            onClick={(e) => {
+              e.stopPropagation()
+              onBucketDelete?.(row.original)
+            }}
+          >
+            <IconTrash size={16} />
+          </Button>
+        </div>
+      )
     }
   ]
 
@@ -110,17 +147,22 @@ export function BucketTable({ buckets, onBucketClick, pageSize = 10 }: BucketTab
   })
 
   const totalPages = table.getPageCount()
-  const currentPage = pagination.pageIndex + 1
+  const totalItems = buckets.length
+  const startItem = pagination.pageIndex * pagination.pageSize + 1
+  const endItem = Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalItems)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-0">
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-muted/50">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead
+                    key={header.id}
+                    className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -135,7 +177,7 @@ export function BucketTable({ buckets, onBucketClick, pageSize = 10 }: BucketTab
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
-                  className="cursor-pointer"
+                  className="group cursor-pointer"
                   onClick={() => onBucketClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -156,36 +198,60 @@ export function BucketTable({ buckets, onBucketClick, pageSize = 10 }: BucketTab
         </Table>
       </div>
 
-      {totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
+      {totalItems > 0 && (
+        <div className="flex items-center justify-between border-x border-b px-4 py-3">
+          <span className="text-xs text-muted-foreground">
+            Showing {startItem}-{endItem} of {totalItems} buckets
+          </span>
+          {totalPages > 1 && (
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
                 onClick={() => table.previousPage()}
-                aria-disabled={!table.getCanPreviousPage()}
-                className={!table.getCanPreviousPage() ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-              />
-            </PaginationItem>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <PaginationItem key={page}>
-                <PaginationLink
-                  onClick={() => table.setPageIndex(page - 1)}
-                  isActive={currentPage === page}
-                  className="cursor-pointer"
+                disabled={!table.getCanPreviousPage()}
+              >
+                <span className="sr-only">Previous page</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  {page}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
                 onClick={() => table.nextPage()}
-                aria-disabled={!table.getCanNextPage()}
-                className={!table.getCanNextPage() ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+                disabled={!table.getCanNextPage()}
+              >
+                <span className="sr-only">Next page</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </Button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

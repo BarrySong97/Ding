@@ -17,16 +17,6 @@ const variantLabels: Record<string, string> = {
   'backblaze-b2': 'Backblaze B2'
 }
 
-// Mock usage data since API doesn't provide this
-const mockUsage: Record<string, string> = {
-  'cloudflare-r2': '45.2 GB',
-  'aws-s3': '1.2 TB',
-  'aliyun-oss': '320 GB',
-  'tencent-cos': '180 GB',
-  minio: '25 GB',
-  'backblaze-b2': '500 GB'
-}
-
 function getProviderIcon(provider: TRPCProvider) {
   if (provider.type === 'supabase-storage') {
     return <IconCloud size={24} />
@@ -70,19 +60,36 @@ function getProviderTypeLabel(provider: TRPCProvider): string {
   return variantLabels[provider.variant] || provider.variant
 }
 
+function formatLastOperation(date: Date | string | null | undefined): string {
+  if (!date) return 'Never'
+
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  const now = new Date()
+  const diff = now.getTime() - dateObj.getTime()
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (seconds < 60) return 'Just now'
+  if (minutes < 60) return `${minutes}m ago`
+  if (hours < 24) return `${hours}h ago`
+  if (days < 7) return `${days}d ago`
+
+  return dateObj.toLocaleDateString()
+}
+
 export function ProviderCard({ provider }: ProviderCardProps) {
   const { isLoading, isConnected, stats } = useProviderStatus(provider)
 
   const region =
     provider.type === 's3-compatible' ? provider.region : new URL(provider.projectUrl).hostname
 
-  const usage = provider.type === 's3-compatible' ? mockUsage[provider.variant] || '0 GB' : '0 GB'
-
   const statusText = isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Paused'
 
   return (
     <Link to="/provider/$providerId" params={{ providerId: provider.id }} className="block">
-      <div className="rounded-md border border-border bg-white dark:bg-[#1E1E1E] p-4">
+      <div className="rounded-md border border-border bg-white dark:bg-[#1E1E1E] p-4 transition-colors hover:bg-accent/30">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -112,9 +119,9 @@ export function ProviderCard({ provider }: ProviderCardProps) {
             </div>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
-            {region && (
-              <span className="rounded bg-muted px-2 py-0.5 text-xs font-mono">{region}</span>
-            )}
+            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono">
+              {region || 'Region:auto'}
+            </span>
             <IconChevronRight size={16} />
           </div>
         </div>
@@ -132,9 +139,11 @@ export function ProviderCard({ provider }: ProviderCardProps) {
           </div>
           <div>
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Usage
+              Last Operation
             </div>
-            <div className="mt-0.5 text-lg font-semibold">{usage}</div>
+            <div className="mt-0.5 text-lg font-semibold">
+              {formatLastOperation(provider.lastOperationAt)}
+            </div>
           </div>
         </div>
       </div>

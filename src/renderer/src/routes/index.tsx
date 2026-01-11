@@ -2,10 +2,9 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   IconPlus,
-  IconDatabase,
+  IconCloud,
   IconFolder,
-  IconArrowsDownUp,
-  IconCloud
+  IconWorld
 } from '@tabler/icons-react'
 import { type S3Variant } from '@renderer/db'
 import { EmptyState } from '@/components/provider/empty-state'
@@ -22,18 +21,11 @@ export const Route = createFileRoute('/')({
   component: Index
 })
 
-// Mock dashboard statistics
-const dashboardStats = {
-  totalStorage: { value: '1.84 TB', trend: '+12.5% this month' },
-  activeBuckets: { value: '17', subtitle: 'Across 3 providers' },
-  requests: { value: '84.2K', subtitle: '62MB Bandwidth' },
-  providers: { active: 2, total: 3, status: 'Systems operational' }
-}
-
 function Index() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<S3Variant | undefined>()
   const { data: providers, isLoading } = trpc.provider.list.useQuery()
+  const { data: globalStats } = trpc.provider.getGlobalStats.useQuery()
 
   const handleAddProvider = (variant?: S3Variant) => {
     setSelectedVariant(variant)
@@ -104,30 +96,21 @@ function Index() {
         </div>
 
         {/* Stats Grid */}
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Storage"
-            value={dashboardStats.totalStorage.value}
-            icon={<IconDatabase size={20} />}
-            trend={{ value: dashboardStats.totalStorage.trend, positive: true }}
-          />
-          <StatCard
-            title="Active Buckets"
-            value={dashboardStats.activeBuckets.value}
-            icon={<IconFolder size={20} />}
-            subtitle={dashboardStats.activeBuckets.subtitle}
-          />
-          <StatCard
-            title="Requests (24h)"
-            value={dashboardStats.requests.value}
-            icon={<IconArrowsDownUp size={20} />}
-            subtitle={dashboardStats.requests.subtitle}
-          />
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard
             title="Providers"
-            value={`${dashboardStats.providers.active}/${dashboardStats.providers.total}`}
+            value={String(globalStats?.providersCount ?? 0)}
             icon={<IconCloud size={20} />}
-            status={{ label: dashboardStats.providers.status, active: true }}
+          />
+          <StatCard
+            title="Buckets"
+            value={String(globalStats?.bucketsCount ?? 0)}
+            icon={<IconFolder size={20} />}
+          />
+          <StatCard
+            title="Regions"
+            value={String(globalStats?.regionsCount ?? 0)}
+            icon={<IconWorld size={20} />}
           />
         </div>
 

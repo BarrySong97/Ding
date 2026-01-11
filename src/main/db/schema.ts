@@ -35,7 +35,8 @@ export const providers = pgTable('providers', {
 
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  lastOperationAt: timestamp('last_operation_at', { withTimezone: true })
 })
 
 // Type exports

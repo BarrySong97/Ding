@@ -24,7 +24,8 @@
       "Bash(pnpm typecheck:web:*)",
       "WebFetch(domain:orm.drizzle.team)",
       "Bash(node:*)",
-      "Bash(npm info:*)"
+      "Bash(npm info:*)",
+      "Bash(pnpm db:generate:*)"
     ]
   }
 }

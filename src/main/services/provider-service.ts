@@ -6,7 +6,9 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
-  CopyObjectCommand
+  CopyObjectCommand,
+  CreateBucketCommand,
+  type BucketLocationConstraint
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { createClient } from '@supabase/supabase-js'
@@ -1013,5 +1015,82 @@ export async function moveObjects(input: MoveObjectsInput): Promise<MoveResult> 
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }
+  }
+}
+
+// ============ Create Bucket ============
+
+export interface CreateBucketInput {
+  provider: Provider
+  bucketName: string
+}
+
+export interface CreateBucketResult {
+  success: boolean
+  error?: string
+}
+
+async function createS3Bucket(
+  provider: S3Provider,
+  bucketName: string
+): Promise<CreateBucketResult> {
+  try {
+    const client = createS3Client(provider)
+
+    await client.send(
+      new CreateBucketCommand({
+        Bucket: bucketName,
+        ...(provider.region &&
+          provider.region !== 'us-east-1' && {
+            CreateBucketConfiguration: {
+              LocationConstraint: provider.region as BucketLocationConstraint
+            }
+          })
+      })
+    )
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function createSupabaseBucket(
+  provider: SupabaseProvider,
+  bucketName: string
+): Promise<CreateBucketResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    const { error } = await supabase.storage.createBucket(bucketName, {
+      public: false
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function createBucket(input: CreateBucketInput): Promise<CreateBucketResult> {
+  const { provider, bucketName } = input
+
+  if (provider.type === 's3-compatible') {
+    return createS3Bucket(provider, bucketName)
+  } else {
+    return createSupabaseBucket(provider, bucketName)
   }
 }

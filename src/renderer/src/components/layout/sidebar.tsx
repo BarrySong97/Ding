@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   IconPlus,
@@ -10,6 +11,7 @@ import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@renderer/lib/trpc'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 
 // Active indicator component
 function ActiveIndicator({ height = 'h-9' }: { height?: string }) {
@@ -48,6 +50,7 @@ function getProviderIcon(variant?: string) {
 }
 
 export function Sidebar() {
+  const [addProviderOpen, setAddProviderOpen] = useState(false)
   const { data: providers, isLoading } = trpc.provider.list.useQuery()
   const router = useRouterState()
   const currentPath = router.location.pathname
@@ -65,14 +68,14 @@ export function Sidebar() {
   return (
     <div
       id="sidebar"
-      className="relative overflow-hidden flex min-h-screen h-full w-[72px] flex-col items-center border-r border-[#f2f8f7bf] dark:border-[#333333] bg-[#f2f8f3bf] dark:bg-[#1E1F22] overflow-x-hidden no-draggable py-3 gap-2"
+      className="relative overflow-hidden flex min-h-screen h-full w-[72px] flex-col items-center  bg-[#f2f8f3bf] dark:bg-[#1E1F22] overflow-x-hidden no-draggable py-3 gap-2"
     >
       {/* Dashboard Button */}
       <div className="relative group flex items-center justify-center w-full">
         {isDashboardActive && <ActiveIndicator />}
         <Link
           to="/"
-          className="w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center bg-white text-slate-700 hover:bg-accent/50"
+          className="w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center bg-white text-slate-700 hover:bg-accent"
         >
           <IconLayoutDashboard size={24} />
         </Link>
@@ -109,7 +112,7 @@ export function Sidebar() {
                   params={{ providerId: provider.id }}
                   className={cn(
                     'w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center',
-                    'bg-white hover:bg-accent/50',
+                    'bg-white hover:bg-accent',
                     iconColor
                   )}
                 >
@@ -126,12 +129,12 @@ export function Sidebar() {
 
         {/* Add Provider Button */}
         <div className="relative group flex items-center justify-center mt-2">
-          <Link
-            to="/settings/providers"
-            className="w-12 h-12 rounded-md bg-white dark:bg-[#1E1E1E] text-slate-500 dark:text-slate-400 hover:bg-accent/50 transition-all overflow-hidden shadow-sm flex items-center justify-center border border-dashed border-gray-300 dark:border-gray-600"
+          <button
+            onClick={() => setAddProviderOpen(true)}
+            className="w-12 h-12 rounded-md bg-white dark:bg-[#1E1E1E] text-slate-500 dark:text-slate-400 hover:bg-accent transition-all overflow-hidden shadow-sm flex items-center justify-center border border-dashed border-gray-300 dark:border-gray-600"
           >
             <IconPlus size={24} />
-          </Link>
+          </button>
           {/* Tooltip */}
           <div className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md group-hover:block z-50">
             Add Provider
@@ -145,7 +148,7 @@ export function Sidebar() {
           {isSettingsActive && <ActiveIndicator height="h-7" />}
           <Link
             to="/settings"
-            className="w-10 h-10 rounded-md transition-colors flex items-center justify-center bg-white text-gray-500 dark:text-gray-400 hover:bg-accent/50"
+            className="w-10 h-10 rounded-md transition-colors flex items-center justify-center bg-white text-gray-500 dark:text-gray-400 hover:bg-accent"
           >
             <IconSettings size={20} />
           </Link>
@@ -155,6 +158,9 @@ export function Sidebar() {
           </div>
         </div>
       </div>
+
+      {/* Add Provider Dialog */}
+      <AddProviderDialog open={addProviderOpen} onOpenChange={setAddProviderOpen} />
     </div>
   )
 }

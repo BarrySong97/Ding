@@ -15,7 +15,7 @@ function createWindow(): BrowserWindow {
     titleBarStyle: 'hidden',
     vibrancy: 'under-window',
     titleBarOverlay: {
-      color: '#ffffff',
+      color: '#f2f8f3',
       height: 32,
       symbolColor: '#6a7282'
     },

@@ -23,7 +23,8 @@ function mapRecordToProvider(record: ProviderRecord): Provider {
       bucket: record.bucket ?? undefined,
       accountId: record.accountId ?? undefined,
       createdAt: record.createdAt!,
-      updatedAt: record.updatedAt!
+      updatedAt: record.updatedAt!,
+      lastOperationAt: record.lastOperationAt ?? null
     } as S3Provider
   } else {
     return {
@@ -35,7 +36,8 @@ function mapRecordToProvider(record: ProviderRecord): Provider {
       serviceRoleKey: record.serviceRoleKey ?? undefined,
       bucket: record.bucket ?? undefined,
       createdAt: record.createdAt!,
-      updatedAt: record.updatedAt!
+      updatedAt: record.updatedAt!,
+      lastOperationAt: record.lastOperationAt ?? null
     } as SupabaseProvider
   }
 }
@@ -145,5 +147,13 @@ export const providerRepository = {
     const db = getDatabase()
     const result = await db.delete(schema.providers).where(eq(schema.providers.id, id)).returning()
     return result.length > 0
+  },
+
+  async updateLastOperationAt(id: string): Promise<void> {
+    const db = getDatabase()
+    await db
+      .update(schema.providers)
+      .set({ lastOperationAt: new Date() })
+      .where(eq(schema.providers.id, id))
   }
 }
