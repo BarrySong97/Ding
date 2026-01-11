@@ -1,12 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import {
-  IconLayoutDashboard,
-  IconSettings,
-  IconCloud,
-  IconBrandAws,
-  IconFolder,
-  IconFolderOpen
-} from '@tabler/icons-react'
+import { IconCloud, IconBrandAws, IconFolder, IconFolderOpen } from '@tabler/icons-react'
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -15,20 +8,7 @@ import {
   BreadcrumbSeparator
 } from '@/components/ui/breadcrumb'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
-
-// 路由配置 - 易于维护和扩展
-interface RouteConfig {
-  path: string
-  label: string
-  icon?: React.ComponentType<{ size?: number }>
-}
-
-const routeConfigs: RouteConfig[] = [
-  { path: '/', label: 'Dashboard', icon: IconLayoutDashboard },
-  { path: '/settings', label: 'Settings', icon: IconSettings },
-  { path: '/settings/providers', label: 'Providers', icon: IconFolder },
-  { path: '/settings/compression', label: 'Image Compression' }
-]
+import { findMenuItemByPath } from '@renderer/constants/menu'
 
 // Provider icon based on variant
 function getProviderIcon(variant?: string) {
@@ -57,8 +37,8 @@ export function Header() {
   } = useNavigationStore()
 
   // 查找当前路由配置
-  const findRouteConfig = (path: string): RouteConfig | undefined => {
-    return routeConfigs.find((r) => r.path === path)
+  const findRouteConfig = (path: string) => {
+    return findMenuItemByPath(path)
   }
 
   // 生成面包屑项

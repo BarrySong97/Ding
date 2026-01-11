@@ -1,17 +1,12 @@
 import { useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
-import {
-  IconPlus,
-  IconSettings,
-  IconCloud,
-  IconBrandAws,
-  IconLayoutDashboard
-} from '@tabler/icons-react'
+import { IconPlus, IconCloud, IconBrandAws } from '@tabler/icons-react'
 import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@renderer/lib/trpc'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
+import { MENU_ITEMS } from '@renderer/constants/menu'
 
 // Active indicator component
 function ActiveIndicator({ height = 'h-9' }: { height?: string }) {
@@ -21,6 +16,39 @@ function ActiveIndicator({ height = 'h-9' }: { height?: string }) {
       className={cn('absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-[#20a64b]', height)}
       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
     />
+  )
+}
+
+// Sidebar menu button component
+interface SidebarMenuButtonProps {
+  to: string
+  params?: Record<string, string>
+  icon: React.ReactNode
+  label: string
+  isActive: boolean
+  indicatorHeight?: string
+  buttonClassName?: string
+}
+
+function SidebarMenuButton({
+  to,
+  params,
+  icon,
+  label,
+  isActive,
+  indicatorHeight = 'h-9',
+  buttonClassName = 'w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center bg-white text-slate-700 hover:bg-accent'
+}: SidebarMenuButtonProps) {
+  return (
+    <div className="relative group flex items-center justify-center w-full">
+      {isActive && <ActiveIndicator height={indicatorHeight} />}
+      <Link to={to} params={params} className={buttonClassName}>
+        {icon}
+      </Link>
+      <div className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md group-hover:block z-50">
+        {label}
+      </div>
+    </div>
   )
 }
 
@@ -71,19 +99,12 @@ export function Sidebar() {
       className="relative overflow-hidden flex min-h-screen h-full w-[72px] flex-col items-center  bg-[#f2f8f3bf] dark:bg-[#1E1F22] overflow-x-hidden no-draggable py-3 gap-2"
     >
       {/* Dashboard Button */}
-      <div className="relative group flex items-center justify-center w-full">
-        {isDashboardActive && <ActiveIndicator />}
-        <Link
-          to="/"
-          className="w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center bg-white text-slate-700 hover:bg-accent"
-        >
-          <IconLayoutDashboard size={24} />
-        </Link>
-        {/* Tooltip */}
-        <div className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md group-hover:block z-50">
-          Dashboard
-        </div>
-      </div>
+      <SidebarMenuButton
+        to={MENU_ITEMS.dashboard.path}
+        icon={<MENU_ITEMS.dashboard.icon size={24} />}
+        label={MENU_ITEMS.dashboard.label}
+        isActive={isDashboardActive}
+      />
 
       {/* Separator */}
       <div className="h-[2px] w-8 bg-gray-300 rounded-lg mx-auto my-1 opacity-50" />
@@ -102,27 +123,19 @@ export function Sidebar() {
             const isActive = provider.id === activeProviderId
 
             return (
-              <div
+              <SidebarMenuButton
                 key={provider.id}
-                className="relative group flex items-center justify-center w-full"
-              >
-                {isActive && <ActiveIndicator />}
-                <Link
-                  to="/provider/$providerId"
-                  params={{ providerId: provider.id }}
-                  className={cn(
-                    'w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center',
-                    'bg-white hover:bg-accent',
-                    iconColor
-                  )}
-                >
-                  {getProviderIcon(variant)}
-                </Link>
-                {/* Tooltip */}
-                <div className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md group-hover:block z-50">
-                  {provider.name}
-                </div>
-              </div>
+                to="/provider/$providerId"
+                params={{ providerId: provider.id }}
+                icon={getProviderIcon(variant)}
+                label={provider.name}
+                isActive={isActive}
+                buttonClassName={cn(
+                  'w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center',
+                  'bg-white hover:bg-accent',
+                  iconColor
+                )}
+              />
             )
           })
         )}
@@ -144,19 +157,14 @@ export function Sidebar() {
 
       {/* Bottom Settings */}
       <div className="mt-auto mb-4 w-full">
-        <div className="relative group flex items-center justify-center w-full">
-          {isSettingsActive && <ActiveIndicator height="h-7" />}
-          <Link
-            to="/settings"
-            className="w-10 h-10 rounded-md transition-colors flex items-center justify-center bg-white text-gray-500 dark:text-gray-400 hover:bg-accent"
-          >
-            <IconSettings size={20} />
-          </Link>
-          {/* Tooltip */}
-          <div className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md group-hover:block z-50">
-            Settings
-          </div>
-        </div>
+        <SidebarMenuButton
+          to={MENU_ITEMS.settings.path}
+          icon={<MENU_ITEMS.settings.icon size={20} />}
+          label={MENU_ITEMS.settings.label}
+          isActive={isSettingsActive}
+          indicatorHeight="h-7"
+          buttonClassName="w-10 h-10 rounded-md transition-colors flex items-center justify-center bg-white text-gray-500 dark:text-gray-400 hover:bg-accent"
+        />
       </div>
 
       {/* Add Provider Dialog */}
