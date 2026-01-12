@@ -7,6 +7,7 @@ import {
   IconServer,
   IconSettings,
   IconCopy,
+  IconCheck,
   IconFolderPlus,
   IconDatabase
 } from '@tabler/icons-react'
@@ -142,9 +143,7 @@ function getProviderEndpoint(provider: TRPCProvider): string | null {
     case 'tencent-cos':
       return provider.region ? `https://cos.${provider.region}.myqcloud.com` : null
     case 'cloudflare-r2':
-      return provider.accountId
-        ? `https://${provider.accountId}.r2.cloudflarestorage.com`
-        : null
+      return provider.accountId ? `https://${provider.accountId}.r2.cloudflarestorage.com` : null
     case 'backblaze-b2':
       return provider.region ? `https://s3.${provider.region}.backblazeb2.com` : null
     default:
@@ -284,11 +283,11 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="shrink-0 text-muted-foreground"
+                  className={cn('shrink-0', 'text-muted-foreground')}
                   onClick={handleCopyEndpoint}
                   title={copied ? 'Copied!' : 'Copy URL'}
                 >
-                  <IconCopy size={18} />
+                  {copied ? <IconCheck size={18} /> : <IconCopy size={18} />}
                 </Button>
               </div>
             </div>
