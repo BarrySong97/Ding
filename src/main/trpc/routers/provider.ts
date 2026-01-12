@@ -13,7 +13,8 @@ import {
   renameObjectInputSchema,
   moveObjectInputSchema,
   moveObjectsInputSchema,
-  createBucketInputSchema
+  createBucketInputSchema,
+  deleteBucketInputSchema
 } from '@shared/schema/trpc/provider'
 import {
   testConnection,
@@ -27,7 +28,8 @@ import {
   renameObject,
   moveObject,
   moveObjects,
-  createBucket
+  createBucket,
+  deleteBucket
 } from '@main/services/provider-service'
 import { providerRepository } from '@main/db/provider-repository'
 
@@ -138,6 +140,12 @@ export const providerRouter = router({
 
   createBucket: publicProcedure.input(createBucketInputSchema).mutation(async ({ input }) => {
     const result = await createBucket(input)
+    await providerRepository.updateLastOperationAt(input.provider.id)
+    return result
+  }),
+
+  deleteBucket: publicProcedure.input(deleteBucketInputSchema).mutation(async ({ input }) => {
+    const result = await deleteBucket(input)
     await providerRepository.updateLastOperationAt(input.provider.id)
     return result
   })

@@ -32,8 +32,8 @@ interface BucketTableProps {
 
 export function BucketTableSkeleton() {
   return (
-    <div className="rounded-md border">
-      <Table>
+    <div className="">
+      <Table className="">
         <TableHeader>
           <TableRow>
             <TableHead className="w-1/2">BUCKET NAME</TableHead>
@@ -110,17 +110,6 @@ export function BucketTable({
         <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-300"
-            onClick={(e) => {
-              e.stopPropagation()
-              onBucketClick?.(row.original)
-            }}
-          >
-            Explore
-          </Button>
-          <Button
-            variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
             onClick={(e) => {
@@ -153,7 +142,7 @@ export function BucketTable({
 
   return (
     <div className="space-y-0">
-      <div className="rounded-md border">
+      <div className="rounded-b-none rounded-t-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -199,7 +188,7 @@ export function BucketTable({
       </div>
 
       {totalItems > 0 && (
-        <div className="flex items-center justify-between border-x border-b px-4 py-3">
+        <div className="flex items-center justify-between border-x border-b px-4 py-3 rounded-b-md">
           <span className="text-xs text-muted-foreground">
             Showing {startItem}-{endItem} of {totalItems} buckets
           </span>

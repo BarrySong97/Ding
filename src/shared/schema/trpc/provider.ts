@@ -75,6 +75,11 @@ export const createBucketInputSchema = z.object({
   bucketName: z.string().min(1)
 })
 
+export const deleteBucketInputSchema = z.object({
+  provider: providerSchema,
+  bucketName: z.string().min(1)
+})
+
 // ============ Type Exports ============
 export type CreateProviderInput = z.infer<typeof createProviderInputSchema>
 export type DeleteProviderInput = z.infer<typeof deleteProviderInputSchema>
@@ -89,3 +94,4 @@ export type RenameObjectInput = z.infer<typeof renameObjectInputSchema>
 export type MoveObjectInput = z.infer<typeof moveObjectInputSchema>
 export type MoveObjectsInput = z.infer<typeof moveObjectsInputSchema>
 export type CreateBucketInput = z.infer<typeof createBucketInputSchema>
+export type DeleteBucketInput = z.infer<typeof deleteBucketInputSchema>

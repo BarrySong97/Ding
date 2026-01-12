@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { CreateBucketDialog } from '@renderer/components/provider/create-bucket-dialog'
+import { DeleteBucketDialog } from '@renderer/components/provider/delete-bucket-dialog'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { PageLayout } from '@/components/layout/page-layout'
 
@@ -154,6 +155,8 @@ function getProviderEndpoint(provider: TRPCProvider): string | null {
 function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const { isLoading, isConnected, error, stats, refresh } = useProviderStatus(provider)
   const [createBucketOpen, setCreateBucketOpen] = useState(false)
+  const [deleteBucketOpen, setDeleteBucketOpen] = useState(false)
+  const [bucketToDelete, setBucketToDelete] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   // Navigation store
@@ -190,8 +193,8 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   }
 
   const handleBucketDelete = (bucket: BucketInfo) => {
-    // TODO: Implement bucket deletion with confirmation dialog
-    console.log('Delete bucket:', bucket.name)
+    setBucketToDelete(bucket.name)
+    setDeleteBucketOpen(true)
   }
 
   // Show bucket browser when a bucket is selected
@@ -345,6 +348,15 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
         provider={provider}
         open={createBucketOpen}
         onOpenChange={setCreateBucketOpen}
+        onSuccess={refresh}
+      />
+
+      {/* Delete Bucket Dialog */}
+      <DeleteBucketDialog
+        provider={provider}
+        open={deleteBucketOpen}
+        onOpenChange={setDeleteBucketOpen}
+        bucketName={bucketToDelete}
         onSuccess={refresh}
       />
     </PageLayout>

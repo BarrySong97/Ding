@@ -8,6 +8,7 @@ import {
   DeleteObjectsCommand,
   CopyObjectCommand,
   CreateBucketCommand,
+  DeleteBucketCommand,
   type BucketLocationConstraint
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -1092,5 +1093,74 @@ export async function createBucket(input: CreateBucketInput): Promise<CreateBuck
     return createS3Bucket(provider, bucketName)
   } else {
     return createSupabaseBucket(provider, bucketName)
+  }
+}
+
+// ============ Delete Bucket ============
+
+export interface DeleteBucketInput {
+  provider: Provider
+  bucketName: string
+}
+
+export interface DeleteBucketResult {
+  success: boolean
+  error?: string
+}
+
+async function deleteS3Bucket(
+  provider: S3Provider,
+  bucketName: string
+): Promise<DeleteBucketResult> {
+  try {
+    const client = createS3Client(provider)
+
+    await client.send(
+      new DeleteBucketCommand({
+        Bucket: bucketName
+      })
+    )
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function deleteSupabaseBucket(
+  provider: SupabaseProvider,
+  bucketName: string
+): Promise<DeleteBucketResult> {
+  try {
+    const supabase = createClient(
+      provider.projectUrl,
+      provider.serviceRoleKey || provider.anonKey || ''
+    )
+
+    const { error } = await supabase.storage.deleteBucket(bucketName)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+export async function deleteBucket(input: DeleteBucketInput): Promise<DeleteBucketResult> {
+  const { provider, bucketName } = input
+
+  if (provider.type === 's3-compatible') {
+    return deleteS3Bucket(provider, bucketName)
+  } else {
+    return deleteSupabaseBucket(provider, bucketName)
   }
 }
