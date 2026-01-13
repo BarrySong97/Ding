@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/breadcrumb'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { findMenuItemByPath } from '@renderer/constants/menu'
+import { cn } from '@renderer/lib/utils'
 
 // Provider icon based on variant
 function getProviderIcon(variant?: string) {
@@ -53,10 +54,12 @@ export function Header() {
       // Dashboard page - show as active (no background/shadow)
       items.push(
         <BreadcrumbItem key="dashboard">
-          <div className="flex items-center gap-2">
-            {dashboardConfig?.icon && <dashboardConfig.icon size={16} />}
-            <span className={activeTextStyle}>{dashboardConfig?.label}</span>
-          </div>
+          <BreadcrumbLink asChild>
+            <Link to="/" className={linkStyle}>
+              {dashboardConfig?.icon && <dashboardConfig.icon size={16} />}
+              <span>{dashboardConfig?.label}</span>
+            </Link>
+          </BreadcrumbLink>
         </BreadcrumbItem>
       )
       return items
@@ -211,7 +214,12 @@ export function Header() {
   }
 
   return (
-    <header className="h-12 pl-0 pr-[140px] flex items-center shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable">
+    <header
+      className={cn(
+        'pl-0 pr-[140px] flex items-center  shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable',
+        window.api.platform.isMac ? 'pt-0 h-10 ' : ''
+      )}
+    >
       <Breadcrumb>
         <BreadcrumbList>{renderBreadcrumbs()}</BreadcrumbList>
       </Breadcrumb>

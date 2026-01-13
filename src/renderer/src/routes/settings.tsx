@@ -1,6 +1,4 @@
 import { createFileRoute, Link, Outlet, useRouterState } from '@tanstack/react-router'
-import { IconArrowLeft } from '@tabler/icons-react'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { PageLayout } from '@/components/layout/page-layout'
 
@@ -32,15 +30,6 @@ function SettingsLayout() {
               )}
             >
               Overview
-            </Link>
-            <Link
-              to="/settings/providers"
-              className={cn(
-                'block rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent',
-                isActive('/settings/providers') && 'bg-accent text-accent-foreground'
-              )}
-            >
-              Providers
             </Link>
             <Link
               to="/settings/compression"

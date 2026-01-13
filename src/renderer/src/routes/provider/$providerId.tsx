@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { CreateBucketDialog } from '@renderer/components/provider/create-bucket-dialog'
 import { DeleteBucketDialog } from '@renderer/components/provider/delete-bucket-dialog'
+import { ProviderSettingsDialog } from '@renderer/components/provider/provider-settings-dialog'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { PageLayout } from '@/components/layout/page-layout'
 
@@ -155,6 +156,7 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const { isLoading, isConnected, error, stats, refresh } = useProviderStatus(provider)
   const [createBucketOpen, setCreateBucketOpen] = useState(false)
   const [deleteBucketOpen, setDeleteBucketOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [bucketToDelete, setBucketToDelete] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
@@ -265,7 +267,12 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
             </div>
 
             {/* Settings Button */}
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground"
+              onClick={() => setSettingsOpen(true)}
+            >
               <IconSettings size={20} />
             </Button>
           </div>
@@ -357,6 +364,13 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
         onOpenChange={setDeleteBucketOpen}
         bucketName={bucketToDelete}
         onSuccess={refresh}
+      />
+
+      {/* Provider Settings Dialog */}
+      <ProviderSettingsDialog
+        provider={provider}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
       />
     </PageLayout>
   )

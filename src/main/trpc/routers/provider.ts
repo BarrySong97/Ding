@@ -53,6 +53,12 @@ export const providerRouter = router({
     return providerRepository.delete(input.id)
   }),
 
+  update: publicProcedure
+    .input(z.object({ id: z.string(), name: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return providerRepository.update(input.id, { name: input.name })
+    }),
+
   // ============ Global Statistics ============
   getGlobalStats: publicProcedure.query(async () => {
     const providers = await providerRepository.findAll()
