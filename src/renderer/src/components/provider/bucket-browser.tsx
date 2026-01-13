@@ -1,18 +1,17 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import {
   IconRefresh,
   IconLoader2,
   IconFolder,
-  IconUpload,
+  IconCloudUpload,
   IconFolderPlus,
-  IconChevronLeft,
-  IconChevronRight,
   IconSearch,
-  IconCheckbox
+  IconX,
+  IconTrash,
+  IconChevronRight
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { FileList } from '@renderer/components/file-browser/file-list'
-import { BatchToolbar } from '@renderer/components/file-browser/batch-toolbar'
 import { UploadDialog } from '@renderer/components/provider/upload-dialog'
 import { CreateFolderDialog } from '@renderer/components/provider/create-folder-dialog'
 import { DeleteConfirmDialog } from '@renderer/components/provider/delete-confirm-dialog'
@@ -22,6 +21,15 @@ import { FileDetailSheet } from '@renderer/components/provider/file-detail-sheet
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -51,42 +59,48 @@ interface BucketBrowserProps {
 
 function FileListSkeleton() {
   return (
-    <div className="overflow-auto">
-      <table className="w-full">
-        <thead className="border-b border-border bg-muted/30">
-          <tr>
-            <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Name</th>
-            <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">Size</th>
-            <th className="px-6 py-3 text-left text-sm font-medium text-muted-foreground">
-              Modified
-            </th>
-            <th className="px-6 py-3 text-right text-sm font-medium text-muted-foreground">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="w-12">
+              <Skeleton className="h-4 w-4" />
+            </TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              NAME
+            </TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              SIZE
+            </TableHead>
+            <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              LAST MODIFIED
+            </TableHead>
+            <TableHead className="w-24" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {Array.from({ length: 8 }).map((_, i) => (
-            <tr key={i} className="border-b border-border">
-              <td className="px-6 py-2">
+            <TableRow key={i}>
+              <TableCell className="w-12">
+                <Skeleton className="h-4 w-4" />
+              </TableCell>
+              <TableCell>
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-4 w-4" />
                   <Skeleton className="h-4 w-48" />
                 </div>
-              </td>
-              <td className="px-6 py-4">
+              </TableCell>
+              <TableCell>
                 <Skeleton className="h-4 w-16" />
-              </td>
-              <td className="px-6 py-2">
+              </TableCell>
+              <TableCell>
                 <Skeleton className="h-4 w-24" />
-              </td>
-              <td className="px-6 py-2 text-right">
-                <Skeleton className="ml-auto h-8 w-8" />
-              </td>
-            </tr>
+              </TableCell>
+              <TableCell className="w-24" />
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -105,12 +119,14 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
   const [fileDetailOpen, setFileDetailOpen] = useState(false)
   const [actionFile, setActionFile] = useState<FileItem | null>(null)
-  // New state for batch operations, search, and drag-drop
-  const [selectionMode, setSelectionMode] = useState(false)
+  // State for selection, search, and drag-drop
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
   const [batchMoveDialogOpen, setBatchMoveDialogOpen] = useState(false)
+  // Upload drop zone state
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const trpcUtils = trpc.useUtils()
   const moveObjectsMutation = trpc.provider.moveObjects.useMutation()
@@ -128,7 +144,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
       bucket,
       prefix,
       cursor,
-      maxKeys: 50
+      maxKeys: 30
     },
     {
       refetchOnWindowFocus: false,
@@ -280,10 +296,44 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     }
   }
 
-  const toggleSelectionMode = () => {
-    setSelectionMode(!selectionMode)
-    if (selectionMode) {
-      setSelectedIds(new Set())
+  // Upload drop zone handlers
+  const handleUploadFiles = (_files: File[]) => {
+    // For now, always open upload dialog
+    // The dialog will handle image compression if needed
+    setUploadDialogOpen(true)
+  }
+
+  const handleDropZoneDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDropZoneDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDropZoneDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      handleUploadFiles(files)
+    }
+  }
+
+  const handleDropZoneClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      handleUploadFiles(files)
+    }
+    // Reset input so same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
@@ -303,54 +353,20 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     }
   }
 
-  const currentPage = cursorHistory.length + 1
   const hasPrevPage = cursorHistory.length > 0
   const hasNextPage = data?.hasMore ?? false
 
   const showLoading = isLoading || isFetching
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-[calc(100vh-48px)] flex-col">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-6 py-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setUploadDialogOpen(true)}
-          className="h-8"
-        >
-          <IconUpload size={16} className="mr-2" />
-          Upload
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCreateFolderDialogOpen(true)}
-          className="h-8"
-        >
+      <div className="flex items-center gap-2 border-b border-border px-6 py-2">
+        <Button size="sm" onClick={() => setCreateFolderDialogOpen(true)} className="h-8">
           <IconFolderPlus size={16} className="mr-2" />
           New Folder
         </Button>
-        <Button
-          variant={selectionMode ? 'default' : 'outline'}
-          size="sm"
-          onClick={toggleSelectionMode}
-          className="h-8"
-        >
-          <IconCheckbox size={16} className="mr-2" />
-          Select
-        </Button>
-        <div className="flex-1" />
-        {/* Search input */}
-        <div className="relative w-48">
-          <IconSearch size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 pl-8 text-sm"
-          />
-        </div>
+        <Separator orientation="vertical" className="h-5" />
         <Button
           variant="ghost"
           size="sm"
@@ -360,20 +376,50 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
         >
           <IconRefresh size={16} className={cn(showLoading && 'animate-spin')} />
         </Button>
+        <div className="flex-1" />
+        {/* Search input */}
+        <div className="relative w-64">
+          <IconSearch
+            size={14}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            placeholder="Search files..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 pl-8 text-sm"
+          />
+        </div>
       </div>
 
-      {/* Batch Toolbar */}
-      {selectionMode && (
-        <BatchToolbar
-          selectedCount={selectedIds.size}
-          onDelete={() => setBatchDeleteDialogOpen(true)}
-          onMove={() => setBatchMoveDialogOpen(true)}
-          onClearSelection={() => setSelectedIds(new Set())}
-        />
-      )}
-
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto p-6">
+        {/* Upload Drop Zone */}
+        <div
+          onDragOver={handleDropZoneDragOver}
+          onDragLeave={handleDropZoneDragLeave}
+          onDrop={handleDropZoneDrop}
+          onClick={handleDropZoneClick}
+          className={cn(
+            'mb-6 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed py-4 transition-colors',
+            isDragging
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/50 hover:bg-muted/30'
+          )}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileInputChange}
+            className="hidden"
+          />
+          <IconCloudUpload size={20} className="text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            {isDragging ? 'Drop files here' : 'Click or drag files to upload'}
+          </span>
+        </div>
+
         {isLoading ? (
           <FileListSkeleton />
         ) : error ? (
@@ -403,7 +449,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
               onDelete={handleDelete}
               onRename={handleRename}
               onMove={handleMove}
-              selectable={selectionMode}
+              selectable={true}
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
               draggable={true}
@@ -419,32 +465,64 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
       </div>
 
       {/* Status bar with pagination */}
-      {!isLoading && !error && (
-        <div className="flex items-center justify-between border-t border-border bg-muted/30 px-6 py-2 text-sm text-muted-foreground">
-          <span>{filteredFiles.length} items{searchQuery && ` (filtered from ${files.length})`}</span>
+      {!error && (
+        <div className="flex items-center justify-between border-t border-border px-6 py-3 text-sm text-muted-foreground">
+          <span>Showing {filteredFiles.length} items</span>
           {(hasPrevPage || hasNextPage) && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
+            <div className="flex items-center gap-4">
+              <button
                 onClick={handlePrevPage}
                 disabled={!hasPrevPage || isFetching}
-                className="h-7 px-2"
+                className={cn(
+                  'text-sm transition-colors',
+                  hasPrevPage && !isFetching
+                    ? 'text-foreground hover:text-primary'
+                    : 'cursor-not-allowed text-muted-foreground/50'
+                )}
               >
-                <IconChevronLeft size={16} />
-              </Button>
-              <span className="text-xs">Page {currentPage}</span>
-              <Button
-                variant="ghost"
-                size="sm"
+                Previous
+              </button>
+              <button
                 onClick={handleNextPage}
                 disabled={!hasNextPage || isFetching}
-                className="h-7 px-2"
+                className={cn(
+                  'text-sm transition-colors',
+                  hasNextPage && !isFetching
+                    ? 'text-foreground hover:text-primary'
+                    : 'cursor-not-allowed text-muted-foreground/50'
+                )}
               >
-                <IconChevronRight size={16} />
-              </Button>
+                Next
+              </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating Batch Action Menu */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-3 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
+            <span className="text-sm font-medium">{selectedIds.size} files selected</span>
+            <Separator orientation="vertical" className="h-5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setBatchDeleteDialogOpen(true)}
+              className="h-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <IconTrash size={16} className="mr-1" />
+              Delete
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedIds(new Set())}
+              className="h-8 w-8"
+            >
+              <IconX size={16} />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -581,19 +659,14 @@ function BatchMoveDialog({
 
   const folders = folderData?.files.filter((f) => f.type === 'folder') || []
 
-  const breadcrumbParts = browsePath
-    .replace(/\/$/, '')
-    .split('/')
-    .filter(Boolean)
+  const breadcrumbParts = browsePath.replace(/\/$/, '').split('/').filter(Boolean)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Move {selectedCount} items</DialogTitle>
-          <DialogDescription>
-            Select a destination folder for the selected items
-          </DialogDescription>
+          <DialogDescription>Select a destination folder for the selected items</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -638,9 +711,7 @@ function BatchMoveDialog({
               onClick={() => setSelectedPath(browsePath)}
             >
               <IconFolder size={18} className="text-muted-foreground" />
-              <span className="font-medium">
-                {browsePath ? `Current folder` : 'Root folder'}
-              </span>
+              <span className="font-medium">{browsePath ? `Current folder` : 'Root folder'}</span>
             </button>
 
             {isFoldersLoading ? (
@@ -648,9 +719,7 @@ function BatchMoveDialog({
                 <IconLoader2 size={24} className="animate-spin text-muted-foreground" />
               </div>
             ) : folders.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                No subfolders
-              </div>
+              <div className="py-8 text-center text-sm text-muted-foreground">No subfolders</div>
             ) : (
               folders.map((folder) => (
                 <div
