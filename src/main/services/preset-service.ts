@@ -9,10 +9,10 @@ import type { CompressionPreset } from '@shared/schema/settings'
 // ============ Built-in Presets ============
 
 const BUILT_IN_PRESET_IDS: CompressionPreset[] = [
+  'cover',
+  'card',
   'thumbnail',
-  'preview',
-  'standard',
-  'hd',
+  'content',
   'original'
 ]
 
@@ -43,6 +43,7 @@ export async function initializeBuiltInPresets(): Promise<void> {
         quality: config.quality,
         format: config.format,
         fit: config.fit,
+        aspectRatio: config.aspectRatio,
         createdAt: new Date(),
         updatedAt: new Date()
       })
@@ -61,6 +62,7 @@ function mapRecordToPreset(record: CompressionPresetRecord): Preset {
     quality: record.quality,
     format: record.format as Preset['format'],
     fit: record.fit as Preset['fit'],
+    aspectRatio: record.aspectRatio,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   }
@@ -112,6 +114,7 @@ export async function createPreset(input: CreatePresetInput): Promise<Preset> {
     quality: input.quality,
     format: input.format,
     fit: input.fit,
+    aspectRatio: input.aspectRatio ?? null,
     createdAt: new Date(),
     updatedAt: new Date()
   }
@@ -145,6 +148,7 @@ export async function updatePreset(input: UpdatePresetInput): Promise<Preset> {
   if (input.quality !== undefined) updateData.quality = input.quality
   if (input.format !== undefined) updateData.format = input.format
   if (input.fit !== undefined) updateData.fit = input.fit
+  if (input.aspectRatio !== undefined) updateData.aspectRatio = input.aspectRatio
 
   const result = await db
     .update(compressionPresets)

@@ -12,7 +12,7 @@ import {
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { FileList } from '@renderer/components/file-browser/file-list'
-import { UploadDialog } from '@renderer/components/provider/upload-dialog'
+import { ImageUploadDrawer } from '@renderer/components/provider/image-upload-drawer'
 import { CreateFolderDialog } from '@renderer/components/provider/create-folder-dialog'
 import { DeleteConfirmDialog } from '@renderer/components/provider/delete-confirm-dialog'
 import { RenameDialog } from '@renderer/components/provider/rename-dialog'
@@ -111,7 +111,8 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
 
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([])
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [imageUploadDrawerOpen, setImageUploadDrawerOpen] = useState(false)
+  const [selectedImageFiles, setSelectedImageFiles] = useState<File[]>([])
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
@@ -135,7 +136,9 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   // Build prefix from path segments
   const prefix = useMemo(() => {
     if (path.length === 0) return undefined
-    return path.join('/') + '/'
+    const result = path.join('/') + '/'
+    console.log('[BucketBrowser] Prefix calculated:', { path, prefix: result })
+    return result
   }, [path])
 
   const { data, isLoading, isFetching, error, refetch } = trpc.provider.listObjects.useQuery(
@@ -296,11 +299,27 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     }
   }
 
+  // Check if file is an image
+  const isImageFile = (file: File): boolean => {
+    return (
+      file.type.startsWith('image/') &&
+      ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(
+        file.type.toLowerCase()
+      )
+    )
+  }
+
   // Upload drop zone handlers
-  const handleUploadFiles = (_files: File[]) => {
-    // For now, always open upload dialog
-    // The dialog will handle image compression if needed
-    setUploadDialogOpen(true)
+  const handleUploadFiles = (files: File[]) => {
+    // Check if any files are images
+    const imageFiles = files.filter(isImageFile)
+
+    if (imageFiles.length > 0) {
+      // Open image upload drawer for image files
+      setSelectedImageFiles(imageFiles)
+      setImageUploadDrawerOpen(true)
+    }
+    // TODO: Handle non-image files with direct upload
   }
 
   const handleDropZoneDragOver = (e: React.DragEvent) => {
@@ -527,13 +546,28 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
       )}
 
       {/* Dialogs */}
-      <UploadDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
+      <ImageUploadDrawer
+        open={imageUploadDrawerOpen}
+        onOpenChange={setImageUploadDrawerOpen}
+        files={selectedImageFiles}
         provider={provider}
         bucket={bucket}
         prefix={prefix}
-        onSuccess={() => refetch()}
+        onUploadStart={() => {
+          console.log('[BucketBrowser] Upload started:', {
+            bucket,
+            prefix,
+            fileCount: selectedImageFiles.length,
+            path
+          })
+          // Close dialogs and clear selection on upload start
+          setSelectedImageFiles([])
+        }}
+        onUploadComplete={() => {
+          console.log('[BucketBrowser] Upload completed, refreshing...')
+          // Refresh the file list after all uploads complete
+          refetch()
+        }}
       />
       <CreateFolderDialog
         open={createFolderDialogOpen}

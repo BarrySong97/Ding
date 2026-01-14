@@ -5,6 +5,8 @@ export type UploadStatus = 'pending' | 'compressing' | 'uploading' | 'completed'
 export interface UploadTask {
   id: string
   file: File
+  fileName: string
+  fileSize: number
   providerId: string
   bucket: string
   prefix?: string
@@ -16,12 +18,20 @@ export interface UploadTask {
   originalSize: number
   compressedSize?: number
   isImage: boolean
+  // Output info
+  outputUrl?: string
+  outputKey?: string
+  width?: number
+  height?: number
+  format?: string
 }
 
 interface UploadStore {
   tasks: UploadTask[]
   isProcessing: boolean
   maxConcurrent: number
+  // Drawer state
+  isDrawerOpen: boolean
 
   // Actions
   addTasks: (
@@ -34,6 +44,7 @@ interface UploadStore {
       compressionPreset?: string
     }>
   ) => void
+  addTask: (task: Omit<UploadTask, 'id'>) => string
   removeTask: (id: string) => void
   updateTask: (id: string, updates: Partial<UploadTask>) => void
   pauseTask: (id: string) => void
@@ -41,6 +52,7 @@ interface UploadStore {
   clearCompleted: () => void
   clearAll: () => void
   setProcessing: (isProcessing: boolean) => void
+  setDrawerOpen: (open: boolean) => void
 }
 
 function generateId(): string {
@@ -56,22 +68,25 @@ function isImageFile(file: File): boolean {
   )
 }
 
-export const useUploadStore = create<UploadStore>((set, get) => ({
+export const useUploadStore = create<UploadStore>((set) => ({
   tasks: [],
   isProcessing: false,
   maxConcurrent: 3,
+  isDrawerOpen: false,
 
   addTasks: (newTasks) => {
     const tasks: UploadTask[] = newTasks.map((task) => ({
       id: generateId(),
       file: task.file,
+      fileName: task.file.name,
+      fileSize: task.file.size,
       providerId: task.providerId,
       bucket: task.bucket,
       prefix: task.prefix,
       status: 'pending',
       progress: 0,
       compressionEnabled: task.compressionEnabled ?? true,
-      compressionPreset: task.compressionPreset ?? 'standard',
+      compressionPreset: task.compressionPreset ?? 'content',
       originalSize: task.file.size,
       isImage: isImageFile(task.file)
     }))
@@ -79,6 +94,14 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
     set((state) => ({
       tasks: [...state.tasks, ...tasks]
     }))
+  },
+
+  addTask: (task) => {
+    const id = generateId()
+    set((state) => ({
+      tasks: [...state.tasks, { ...task, id }]
+    }))
+    return id
   },
 
   removeTask: (id) => {
@@ -121,6 +144,10 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
 
   setProcessing: (isProcessing) => {
     set({ isProcessing })
+  },
+
+  setDrawerOpen: (open) => {
+    set({ isDrawerOpen: open })
   }
 }))
 

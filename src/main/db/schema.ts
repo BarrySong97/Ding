@@ -52,6 +52,7 @@ export const compressionPresets = pgTable('compression_presets', {
   quality: integer('quality').notNull(),
   format: text('format').notNull(), // 'webp' | 'jpeg' | 'png' | 'original'
   fit: text('fit').notNull(), // 'cover' | 'contain' | 'fill' | 'inside' | 'outside'
+  aspectRatio: text('aspect_ratio'), // e.g., '16:9', '4:3', null for original
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 })

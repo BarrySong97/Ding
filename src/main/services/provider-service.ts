@@ -275,6 +275,29 @@ async function listS3Objects(
     }
   }
 
+  // Sort files: folders first (alphabetically), then files by modified date (newest first)
+  files.sort((a, b) => {
+    // Folders always come first
+    if (a.type === 'folder' && b.type !== 'folder') return -1
+    if (a.type !== 'folder' && b.type === 'folder') return 1
+
+    // Both are folders: sort alphabetically
+    if (a.type === 'folder' && b.type === 'folder') {
+      return a.name.localeCompare(b.name)
+    }
+
+    // Both are files: sort by modified date (newest first)
+    if (a.modified && b.modified) {
+      return new Date(b.modified).getTime() - new Date(a.modified).getTime()
+    }
+
+    // If one doesn't have modified date, put it at the end
+    if (!a.modified) return 1
+    if (!b.modified) return -1
+
+    return 0
+  })
+
   return {
     files,
     nextCursor: response.NextContinuationToken,
@@ -314,6 +337,29 @@ async function listSupabaseObjects(
       modified: item.updated_at,
       mimeType: item.metadata?.mimetype
     })) || []
+
+  // Sort files: folders first (alphabetically), then files by modified date (newest first)
+  files.sort((a, b) => {
+    // Folders always come first
+    if (a.type === 'folder' && b.type !== 'folder') return -1
+    if (a.type !== 'folder' && b.type === 'folder') return 1
+
+    // Both are folders: sort alphabetically
+    if (a.type === 'folder' && b.type === 'folder') {
+      return a.name.localeCompare(b.name)
+    }
+
+    // Both are files: sort by modified date (newest first)
+    if (a.modified && b.modified) {
+      return new Date(b.modified).getTime() - new Date(a.modified).getTime()
+    }
+
+    // If one doesn't have modified date, put it at the end
+    if (!a.modified) return 1
+    if (!b.modified) return -1
+
+    return 0
+  })
 
   const hasMore = data?.length === maxKeys
   const nextCursor = hasMore ? String(offset + maxKeys) : undefined
@@ -361,6 +407,18 @@ async function uploadS3File(
     const client = createS3Client(provider)
     const buffer = Buffer.from(content, 'base64')
 
+    console.log('[uploadS3File] Uploading:', {
+      bucket,
+      key,
+      contentType,
+      bufferSize: buffer.length,
+      provider: {
+        variant: provider.variant,
+        region: provider.region,
+        endpoint: getS3Endpoint(provider)
+      }
+    })
+
     await client.send(
       new PutObjectCommand({
         Bucket: bucket,
@@ -370,8 +428,15 @@ async function uploadS3File(
       })
     )
 
+    console.log('[uploadS3File] Upload successful:', { bucket, key })
     return { success: true }
   } catch (error) {
+    console.error('[uploadS3File] Upload failed:', {
+      bucket,
+      key,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorDetails: error
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -397,17 +462,37 @@ async function uploadSupabaseFile(
       type: contentType || getMimeType(key) || 'application/octet-stream'
     })
 
+    console.log('[uploadSupabaseFile] Uploading:', {
+      bucket,
+      key,
+      contentType,
+      blobSize: blob.size
+    })
+
     const { error } = await supabase.storage.from(bucket).upload(key, blob, {
       contentType: contentType || getMimeType(key) || 'application/octet-stream',
       upsert: true
     })
 
     if (error) {
+      console.error('[uploadSupabaseFile] Upload failed:', {
+        bucket,
+        key,
+        error: error.message,
+        errorDetails: error
+      })
       return { success: false, error: error.message }
     }
 
+    console.log('[uploadSupabaseFile] Upload successful:', { bucket, key })
     return { success: true }
   } catch (error) {
+    console.error('[uploadSupabaseFile] Upload exception:', {
+      bucket,
+      key,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorDetails: error
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

@@ -1,6 +1,7 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
+import { UploadFAB, UploadManagerDrawer } from '@/components/upload-manager'
 import { Toaster } from 'sonner'
 import { cn } from '@renderer/lib/utils'
 
@@ -18,6 +19,8 @@ export const Route = createRootRoute({
         </div>
       </main>
       <Toaster />
+      <UploadFAB />
+      <UploadManagerDrawer />
     </div>
   )
 })

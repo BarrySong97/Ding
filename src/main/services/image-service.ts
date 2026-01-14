@@ -13,48 +13,54 @@ export interface CompressionConfig {
   quality: number
   format: 'webp' | 'jpeg' | 'png' | 'original'
   fit: FitMode
+  aspectRatio: string | null // e.g., '16:9', '4:3', null for original
 }
 
 export const COMPRESSION_PRESETS: Record<CompressionPreset, CompressionConfig> = {
-  thumbnail: {
-    preset: 'thumbnail',
-    maxWidth: 200,
-    maxHeight: 200,
-    quality: 60,
+  cover: {
+    preset: 'cover',
+    maxWidth: 1920,
+    maxHeight: 1080,
+    quality: 80,
     format: 'webp',
-    fit: 'cover'
+    fit: 'cover',
+    aspectRatio: '16:9'
   },
-  preview: {
-    preset: 'preview',
+  card: {
+    preset: 'card',
     maxWidth: 800,
-    maxHeight: 800,
+    maxHeight: 600,
     quality: 75,
     format: 'webp',
-    fit: 'inside'
+    fit: 'cover',
+    aspectRatio: '4:3'
   },
-  standard: {
-    preset: 'standard',
-    maxWidth: 1920,
-    maxHeight: 1920,
-    quality: 85,
+  thumbnail: {
+    preset: 'thumbnail',
+    maxWidth: 400,
+    maxHeight: 300,
+    quality: 70,
     format: 'webp',
-    fit: 'inside'
+    fit: 'cover',
+    aspectRatio: '4:3'
   },
-  hd: {
-    preset: 'hd',
-    maxWidth: 4096,
-    maxHeight: 4096,
-    quality: 90,
+  content: {
+    preset: 'content',
+    maxWidth: 1200,
+    maxHeight: 10000,
+    quality: 80,
     format: 'webp',
-    fit: 'inside'
+    fit: 'inside',
+    aspectRatio: null
   },
   original: {
     preset: 'original',
     maxWidth: Infinity,
     maxHeight: Infinity,
-    quality: 100,
-    format: 'original',
-    fit: 'inside'
+    quality: 90,
+    format: 'webp',
+    fit: 'inside',
+    aspectRatio: null
   }
 }
 
@@ -112,7 +118,8 @@ export async function compressImage(input: CompressImageInput): Promise<Compress
       maxHeight: dbPreset.maxHeight,
       quality: dbPreset.quality,
       format: dbPreset.format as CompressionConfig['format'],
-      fit: dbPreset.fit
+      fit: dbPreset.fit,
+      aspectRatio: dbPreset.aspectRatio ?? null
     }
   } else if (presetId in COMPRESSION_PRESETS) {
     // Fallback to hardcoded preset
@@ -125,15 +132,44 @@ export async function compressImage(input: CompressImageInput): Promise<Compress
     }
   }
 
-  // If original preset, return as-is
-  if (presetId === 'original' || (config.maxWidth >= 999999 && config.quality === 100)) {
+  // At this point config is guaranteed to be non-null
+  const compressionConfig = config
+
+  // If original preset with very large dimensions, only apply quality compression
+  if (compressionConfig.maxWidth >= 999999 && compressionConfig.maxHeight >= 999999) {
     const buffer = Buffer.from(content, 'base64')
-    return {
-      success: true,
-      content,
-      originalSize: buffer.length,
-      compressedSize: buffer.length,
-      format: 'original'
+    // For original preset, apply format conversion but no resizing
+    try {
+      const metadata = await sharp(buffer).metadata()
+      let outputBuffer: Buffer
+      let outputFormat: string
+
+      if (compressionConfig.format === 'original' || compressionConfig.format === 'webp') {
+        outputBuffer = await sharp(buffer).webp({ quality: compressionConfig.quality }).toBuffer()
+        outputFormat = 'webp'
+      } else {
+        outputBuffer = buffer
+        outputFormat = metadata.format || 'unknown'
+      }
+
+      const outputMetadata = await sharp(outputBuffer).metadata()
+      return {
+        success: true,
+        content: outputBuffer.toString('base64'),
+        originalSize: buffer.length,
+        compressedSize: outputBuffer.length,
+        width: outputMetadata.width,
+        height: outputMetadata.height,
+        format: outputFormat
+      }
+    } catch {
+      return {
+        success: true,
+        content,
+        originalSize: buffer.length,
+        compressedSize: buffer.length,
+        format: 'original'
+      }
     }
   }
 
@@ -150,9 +186,9 @@ export async function compressImage(input: CompressImageInput): Promise<Compress
     let targetWidth = originalWidth
     let targetHeight = originalHeight
 
-    if (originalWidth > config.maxWidth || originalHeight > config.maxHeight) {
-      const widthRatio = config.maxWidth / originalWidth
-      const heightRatio = config.maxHeight / originalHeight
+    if (originalWidth > compressionConfig.maxWidth || originalHeight > compressionConfig.maxHeight) {
+      const widthRatio = compressionConfig.maxWidth / originalWidth
+      const heightRatio = compressionConfig.maxHeight / originalHeight
       const ratio = Math.min(widthRatio, heightRatio)
 
       targetWidth = Math.round(originalWidth * ratio)
@@ -169,37 +205,37 @@ export async function compressImage(input: CompressImageInput): Promise<Compress
     let outputBuffer: Buffer
     let outputFormat: string
 
-    switch (config.format) {
+    switch (compressionConfig.format) {
       case 'webp':
-        outputBuffer = await pipeline.webp({ quality: config.quality }).toBuffer()
+        outputBuffer = await pipeline.webp({ quality: compressionConfig.quality }).toBuffer()
         outputFormat = 'webp'
         break
       case 'jpeg':
-        outputBuffer = await pipeline.jpeg({ quality: config.quality }).toBuffer()
+        outputBuffer = await pipeline.jpeg({ quality: compressionConfig.quality }).toBuffer()
         outputFormat = 'jpeg'
         break
       case 'png':
         outputBuffer = await pipeline
-          .png({ compressionLevel: Math.round((100 - config.quality) / 10) })
+          .png({ compressionLevel: Math.round((100 - compressionConfig.quality) / 10) })
           .toBuffer()
         outputFormat = 'png'
         break
       default:
         // Keep original format but apply quality
         if (metadata.format === 'jpeg' || metadata.format === 'jpg') {
-          outputBuffer = await pipeline.jpeg({ quality: config.quality }).toBuffer()
+          outputBuffer = await pipeline.jpeg({ quality: compressionConfig.quality }).toBuffer()
           outputFormat = 'jpeg'
         } else if (metadata.format === 'png') {
           outputBuffer = await pipeline
-            .png({ compressionLevel: Math.round((100 - config.quality) / 10) })
+            .png({ compressionLevel: Math.round((100 - compressionConfig.quality) / 10) })
             .toBuffer()
           outputFormat = 'png'
         } else if (metadata.format === 'webp') {
-          outputBuffer = await pipeline.webp({ quality: config.quality }).toBuffer()
+          outputBuffer = await pipeline.webp({ quality: compressionConfig.quality }).toBuffer()
           outputFormat = 'webp'
         } else {
           // For other formats, convert to webp
-          outputBuffer = await pipeline.webp({ quality: config.quality }).toBuffer()
+          outputBuffer = await pipeline.webp({ quality: compressionConfig.quality }).toBuffer()
           outputFormat = 'webp'
         }
     }

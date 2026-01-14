@@ -1,15 +1,13 @@
 import { z } from 'zod'
 
 // Compression presets (built-in preset IDs)
-export const compressionPresets = [
-  'thumbnail',
-  'preview',
-  'standard',
-  'hd',
-  'original'
-] as const
+export const compressionPresets = ['cover', 'card', 'thumbnail', 'content', 'original'] as const
 
 export type CompressionPreset = (typeof compressionPresets)[number]
+
+// Aspect ratios for cropping
+export const aspectRatios = ['16:9', '4:3', '1:1', null] as const
+export type AspectRatio = (typeof aspectRatios)[number]
 
 // Fit modes for Sharp.js
 export const fitModes = ['cover', 'contain', 'fill', 'inside', 'outside'] as const
@@ -28,6 +26,7 @@ export const presetSchema = z.object({
   quality: z.number().int().min(1, 'Quality must be at least 1').max(100, 'Quality must be 100 or less'),
   format: z.enum(compressionFormats),
   fit: z.enum(fitModes),
+  aspectRatio: z.string().nullable().optional(), // e.g., '16:9', '4:3', null for original
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date()
 })

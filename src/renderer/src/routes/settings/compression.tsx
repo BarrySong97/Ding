@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PresetDialog } from '@/components/preset-dialog'
+import { ImageCropper } from '@/components/ui/image-cropper'
+import type { AspectRatioOption } from '@/components/ui/image-cropper'
 
 export const Route = createFileRoute('/settings/compression')({
   component: CompressionSettings
@@ -26,6 +28,11 @@ const fitModeDescriptions: Record<string, string> = {
   fill: 'Stretch to fill (may distort)',
   inside: 'Fit inside, no enlargement (default)',
   outside: 'Fit outside, may crop'
+}
+
+function mapAspectRatio(ratio: string | null | undefined): AspectRatioOption {
+  if (ratio === '16:9' || ratio === '4:3' || ratio === '1:1') return ratio
+  return 'free'
 }
 
 function formatBytes(bytes: number): string {
@@ -68,6 +75,13 @@ function CompressionSettings() {
   // Compression test result
   const [testResult, setTestResult] = useState<CompressionResult | null>(null)
 
+  // Cropper state
+  const [cropperOpen, setCropperOpen] = useState(false)
+  const [imageToProcess, setImageToProcess] = useState<{
+    dataUrl: string
+    filePath: string
+  } | null>(null)
+
   // Get selected preset data
   const selectedPreset = presets?.find((p) => p.id === selectedPresetId)
 
@@ -97,6 +111,16 @@ function CompressionSettings() {
     }
   }
 
+  // Handle aspect ratio change
+  const handleAspectRatioChange = (value: string) => {
+    if (selectedPreset) {
+      updateMutation.mutate({
+        id: selectedPreset.id,
+        aspectRatio: value === 'none' ? null : value
+      })
+    }
+  }
+
   // Handle edit more dialog submit
   const handleEditSubmit = async (data: CreatePresetInput) => {
     if (selectedPreset) {
@@ -113,17 +137,44 @@ function CompressionSettings() {
 
     // Select file
     const fileResult = await selectFileMutation.mutateAsync()
-    if (fileResult.canceled || !fileResult.filePath) {
+    if (fileResult.canceled || !fileResult.filePath || !fileResult.content) {
       return
     }
 
-    // Compress file
+    // Check if preset has aspectRatio that requires cropping
+    if (selectedPreset?.aspectRatio) {
+      // Open cropper first
+      setImageToProcess({
+        dataUrl: `data:image/png;base64,${fileResult.content}`,
+        filePath: fileResult.filePath
+      })
+      setCropperOpen(true)
+    } else {
+      // Compress directly without cropping
+      const result = await compressFileMutation.mutateAsync({
+        filePath: fileResult.filePath,
+        presetId: selectedPresetId
+      })
+      setTestResult(result as CompressionResult)
+    }
+  }
+
+  // Handle crop complete
+  const handleCropComplete = async (croppedImageData: string) => {
+    if (!imageToProcess) return
+
+    // Extract base64 content from data URL
+    const base64Content = croppedImageData.replace(/^data:image\/\w+;base64,/, '')
+
+    // Compress the cropped image
     const result = await compressFileMutation.mutateAsync({
-      filePath: fileResult.filePath,
-      presetId: selectedPresetId
+      filePath: imageToProcess.filePath,
+      presetId: selectedPresetId,
+      content: base64Content
     })
 
     setTestResult(result as CompressionResult)
+    setImageToProcess(null)
   }
 
   const isTestingCompression = selectFileMutation.isPending || compressFileMutation.isPending
@@ -183,6 +234,7 @@ function CompressionSettings() {
                           {preset.maxWidth >= 999999 ? '∞' : preset.maxWidth}×
                           {preset.maxHeight >= 999999 ? '∞' : preset.maxHeight}, {preset.quality}%,{' '}
                           <span className="uppercase">{preset.format}</span>
+                          {preset.aspectRatio && ` (${preset.aspectRatio})`}
                         </span>
                       </div>
                     </SelectItem>
@@ -236,6 +288,29 @@ function CompressionSettings() {
                   {fitModeDescriptions[selectedPreset.fit]}
                 </p>
               )}
+            </div>
+
+            {/* Aspect Ratio Select */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Crop Ratio</label>
+              <Select
+                onValueChange={handleAspectRatioChange}
+                value={selectedPreset?.aspectRatio ?? 'none'}
+                disabled={!selectedPreset}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No cropping" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No cropping</SelectItem>
+                  <SelectItem value="16:9">16:9 (Widescreen)</SelectItem>
+                  <SelectItem value="4:3">4:3 (Standard)</SelectItem>
+                  <SelectItem value="1:1">1:1 (Square)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-2 text-sm text-muted-foreground">
+                When set, images will be cropped to this ratio before compression
+              </p>
             </div>
 
             {/* Action Buttons */}
@@ -330,6 +405,17 @@ function CompressionSettings() {
         onSubmit={handleEditSubmit}
         preset={selectedPreset}
         mode="edit"
+      />
+
+      {/* Image Cropper Dialog */}
+      <ImageCropper
+        open={cropperOpen}
+        onOpenChange={setCropperOpen}
+        imageSrc={imageToProcess?.dataUrl ?? ''}
+        aspectRatio={mapAspectRatio(selectedPreset?.aspectRatio)}
+        onCropComplete={handleCropComplete}
+        title="Crop Image"
+        description={`Crop to ${selectedPreset?.aspectRatio} ratio for ${selectedPreset?.name} preset`}
       />
     </div>
   )

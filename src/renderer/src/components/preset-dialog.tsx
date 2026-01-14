@@ -40,7 +40,8 @@ export function PresetDialog({ open, onOpenChange, onSubmit, preset, mode }: Pre
       maxHeight: 1920,
       quality: 85,
       format: 'webp',
-      fit: 'inside'
+      fit: 'inside',
+      aspectRatio: null
     }
   })
 
@@ -54,7 +55,8 @@ export function PresetDialog({ open, onOpenChange, onSubmit, preset, mode }: Pre
           maxHeight: preset.maxHeight,
           quality: preset.quality,
           format: preset.format,
-          fit: preset.fit
+          fit: preset.fit,
+          aspectRatio: preset.aspectRatio ?? null
         })
       } else {
         form.reset({
@@ -63,7 +65,8 @@ export function PresetDialog({ open, onOpenChange, onSubmit, preset, mode }: Pre
           maxHeight: 1920,
           quality: 85,
           format: 'webp',
-          fit: 'inside'
+          fit: 'inside',
+          aspectRatio: null
         })
       }
     }
@@ -229,6 +232,37 @@ export function PresetDialog({ open, onOpenChange, onSubmit, preset, mode }: Pre
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldState.error?.message && (
+                  <FieldError>{fieldState.error.message}</FieldError>
+                )}
+              </Field>
+            )}
+          />
+
+          {/* Aspect Ratio */}
+          <Controller
+            name="aspectRatio"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={field.name}>Crop Ratio</FieldLabel>
+                <Select
+                  onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
+                  value={field.value ?? 'none'}
+                >
+                  <SelectTrigger id={field.name} aria-invalid={fieldState.invalid}>
+                    <SelectValue placeholder="No cropping" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No cropping</SelectItem>
+                    <SelectItem value="16:9">16:9 (Widescreen)</SelectItem>
+                    <SelectItem value="4:3">4:3 (Standard)</SelectItem>
+                    <SelectItem value="1:1">1:1 (Square)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  When set, images will be cropped to this ratio before compression
+                </p>
                 {fieldState.error?.message && (
                   <FieldError>{fieldState.error.message}</FieldError>
                 )}
