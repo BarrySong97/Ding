@@ -12,10 +12,7 @@ export const Route = createRootRoute({
         <div className="h-[30px] fixed right-0 w-[120px] draggable z-50"></div>
         <Header />
         <div
-          className={cn(
-            ' bg-white flex-1 overflow-hidden rounded-tl-md',
-            window.api.platform.isMac ? 'h-[calc(100vh-48px)]' : 'h-[calc(100vh-48px)]'
-          )}
+          className={cn(' bg-white flex-1 overflow-hidden rounded-tl-md', 'h-[calc(100vh-48px)]')}
         >
           <Outlet />
         </div>

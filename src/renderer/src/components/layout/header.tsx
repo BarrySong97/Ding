@@ -217,7 +217,7 @@ export function Header() {
     <header
       className={cn(
         'pl-0 pr-[140px] flex items-center  shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable',
-        window.api.platform.isMac ? 'pt-0 h-10 ' : ''
+        window.api.platform.isMac ? 'pt-0 h-10 ' : 'h-12'
       )}
     >
       <Breadcrumb>
