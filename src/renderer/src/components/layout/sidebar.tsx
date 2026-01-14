@@ -88,6 +88,7 @@ export function Sidebar() {
   }
 
   const isDashboardActive = currentPath === '/'
+  const isMyUploadsActive = currentPath.startsWith('/my-uploads')
   const isSettingsActive = currentPath.startsWith('/settings')
 
   // Find active provider
@@ -158,8 +159,19 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Bottom Settings */}
-      <div className="mt-auto mb-4 w-full">
+      {/* Bottom Menu Items */}
+      <div className="mt-auto mb-4 w-full space-y-2">
+        {/* My Uploads */}
+        <SidebarMenuButton
+          to={MENU_ITEMS.myUploads.path}
+          icon={<MENU_ITEMS.myUploads.icon size={20} />}
+          label={MENU_ITEMS.myUploads.label}
+          isActive={isMyUploadsActive}
+          indicatorHeight="h-7"
+          buttonClassName="w-10 h-10 rounded-md transition-colors flex items-center justify-center bg-white text-gray-500 dark:text-gray-400 hover:bg-accent"
+        />
+
+        {/* Settings */}
         <SidebarMenuButton
           to={MENU_ITEMS.settings.path}
           icon={<MENU_ITEMS.settings.icon size={20} />}

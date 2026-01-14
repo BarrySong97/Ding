@@ -2,7 +2,8 @@ import {
   IconLayoutDashboard,
   IconSettings,
   IconFolder,
-  IconPhoto
+  IconPhoto,
+  IconUpload
 } from '@tabler/icons-react'
 
 // 菜单项类型定义
@@ -20,6 +21,12 @@ export const MENU_ITEMS = {
     path: '/',
     label: 'Dashboard',
     icon: IconLayoutDashboard
+  },
+  myUploads: {
+    id: 'my-uploads',
+    path: '/my-uploads',
+    label: 'My Uploads',
+    icon: IconUpload
   },
   settings: {
     id: 'settings',
