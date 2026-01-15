@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { IconPlus } from '@tabler/icons-react'
+import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@renderer/lib/trpc'
 import {
@@ -14,11 +15,69 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
-  SidebarSeparator
+  SidebarSeparator,
+  useSidebar
 } from '@/components/ui/sidebar'
+import { IconLayoutSidebar } from '@tabler/icons-react'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { MENU_ITEMS } from '@renderer/constants/menu'
 import { ProviderBrandIcon, getProviderIconKey } from '@/components/provider/brand-icon'
+import { StreamlinePlumpModule } from './icon'
+
+// Active indicator component - green color, positioned at sidebar edge
+function ActiveIndicator() {
+  return (
+    <motion.div
+      layoutId="sidebar-indicator"
+      className="absolute -left-2 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-[#20a64b]"
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+    />
+  )
+}
+
+// Custom menu button styles
+const menuButtonStyles = cn(
+  // Reset shadcn default active/hover styles
+  'data-active:bg-white data-active:dark:bg-[#2a2a2a] data-active:shadow-sm data-active:text-foreground rounded-md',
+  'hover:bg-white/50 dark:hover:bg-white/10',
+  'active:bg-white/50 dark:active:bg-white/10'
+)
+
+// Toggle sidebar button component
+function ToggleSidebarButton() {
+  const { toggleSidebar, state } = useSidebar()
+  const isExpanded = state === 'expanded'
+
+  return (
+    <SidebarMenuButton
+      tooltip="Toggle Sidebar"
+      onClick={toggleSidebar}
+      className={menuButtonStyles}
+    >
+      <IconLayoutSidebar size={18} />
+      <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+    </SidebarMenuButton>
+  )
+}
+
+// App brand component - icon stays in place, only sidebar width changes
+function AppBrand() {
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem className="relative">
+        <SidebarMenuButton
+          asChild
+          className={cn(menuButtonStyles, 'hover:bg-transparent active:bg-transparent cursor-none')}
+        >
+          <Link to={MENU_ITEMS.dashboard.path}>
+            <StreamlinePlumpModule />
+            <span className="font-bold">DING</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
+}
 
 // Maximum number of providers to show in sidebar
 const MAX_RECENT_PROVIDERS = 5
@@ -46,21 +105,30 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="icon" className="border-r-0">
-        {/* Mac drag area */}
+      <Sidebar collapsible="icon" className="!border-none">
+        {/* Header with App Brand */}
         <SidebarHeader
-          className={cn('p-0', window.api.platform.isMac && 'h-[30px] draggable')}
-        />
+          className={cn(
+            window.api.platform.isMac ? 'pt-6 draggable' : '',
+            'bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333]'
+          )}
+        >
+          {/* App Brand */}
+          <AppBrand />
+        </SidebarHeader>
 
         <SidebarContent className="bg-[#f2f8f3bf] dark:bg-[#1E1F22]">
           {/* Main Navigation */}
           <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
             <SidebarMenu>
-              <SidebarMenuItem>
+              <SidebarMenuItem className="relative">
+                {isDashboardActive && <ActiveIndicator />}
                 <SidebarMenuButton
                   asChild
                   tooltip={MENU_ITEMS.dashboard.label}
                   isActive={isDashboardActive}
+                  className={menuButtonStyles}
                 >
                   <Link to={MENU_ITEMS.dashboard.path}>
                     <MENU_ITEMS.dashboard.icon size={18} />
@@ -69,11 +137,13 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
+              <SidebarMenuItem className="relative">
+                {isProvidersActive && <ActiveIndicator />}
                 <SidebarMenuButton
                   asChild
                   tooltip={MENU_ITEMS.providers.label}
                   isActive={isProvidersActive}
+                  className={menuButtonStyles}
                 >
                   <Link to={MENU_ITEMS.providers.path}>
                     <MENU_ITEMS.providers.icon size={18} />
@@ -82,11 +152,13 @@ export function AppSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
+              <SidebarMenuItem className="relative">
+                {isUploadHistoryActive && <ActiveIndicator />}
                 <SidebarMenuButton
                   asChild
                   tooltip={MENU_ITEMS.uploadHistory.label}
                   isActive={isUploadHistoryActive}
+                  className={menuButtonStyles}
                 >
                   <Link to={MENU_ITEMS.uploadHistory.path}>
                     <MENU_ITEMS.uploadHistory.icon size={18} />
@@ -97,7 +169,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroup>
 
-          <SidebarSeparator />
+          <SidebarSeparator className="!w-auto" />
 
           {/* Recent Providers */}
           <SidebarGroup className="flex-1">
@@ -114,21 +186,16 @@ export function AppSidebar() {
                   const isActive = provider.id === activeProviderId
 
                   return (
-                    <SidebarMenuItem key={provider.id}>
+                    <SidebarMenuItem key={provider.id} className="relative">
+                      {isActive && <ActiveIndicator />}
                       <SidebarMenuButton
                         asChild
                         tooltip={provider.name}
                         isActive={isActive}
+                        className={menuButtonStyles}
                       >
-                        <Link
-                          to="/provider/$providerId"
-                          params={{ providerId: provider.id }}
-                        >
-                          <ProviderBrandIcon
-                            iconKey={iconKey}
-                            size={20}
-                            showBackground={false}
-                          />
+                        <Link to="/provider/$providerId" params={{ providerId: provider.id }}>
+                          <ProviderBrandIcon iconKey={iconKey} size={20} showBackground={false} />
                           <span>{provider.name}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -142,7 +209,7 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   tooltip="Add Provider"
                   onClick={() => setAddProviderOpen(true)}
-                  className="text-muted-foreground"
+                  className={cn(menuButtonStyles, 'text-muted-foreground')}
                 >
                   <IconPlus size={18} />
                   <span>Add Provider</span>
@@ -152,14 +219,22 @@ export function AppSidebar() {
           </SidebarGroup>
         </SidebarContent>
 
-        {/* Settings at bottom */}
+        {/* Settings and Toggle at bottom */}
         <SidebarFooter className="bg-[#f2f8f3bf] dark:bg-[#1E1F22]">
           <SidebarMenu>
+            {/* Toggle Sidebar Button */}
             <SidebarMenuItem>
+              <ToggleSidebarButton />
+            </SidebarMenuItem>
+
+            {/* Settings */}
+            <SidebarMenuItem className="relative">
+              {isSettingsActive && <ActiveIndicator />}
               <SidebarMenuButton
                 asChild
                 tooltip={MENU_ITEMS.settings.label}
                 isActive={isSettingsActive}
+                className={menuButtonStyles}
               >
                 <Link to={MENU_ITEMS.settings.path}>
                   <MENU_ITEMS.settings.icon size={18} />

@@ -8,8 +8,8 @@ interface PageLayoutProps {
 
 export function PageLayout({ children, className }: PageLayoutProps) {
   return (
-    <ScrollArea className={'h-[calc(100vh-48px)]'}>
-      <div className={cn('w-full p-6', className)}>{children}</div>
+    <ScrollArea className={'h-[calc(100vh-48px)] '}>
+      <div className={cn('w-full p-6  bg-white', className)}>{children}</div>
     </ScrollArea>
   )
 }

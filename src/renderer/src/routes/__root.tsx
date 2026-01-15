@@ -12,11 +12,11 @@ export const Route = createRootRoute({
     <TooltipProvider>
       <SidebarProvider defaultOpen={false}>
         <AppSidebar />
-        <SidebarInset className="flex flex-col overflow-hidden">
+        <SidebarInset className="flex flex-col overflow-hidden bg-[#f2f8f3bf]">
           <div className="h-[30px] fixed right-0 w-[120px] draggable z-50" />
           <Header />
           <div
-            className={cn('bg-white flex-1 overflow-hidden rounded-tl-md', 'h-[calc(100vh-48px)]')}
+            className={cn(' flex-1 overflow-hidden rounded-t-lg bg-white', 'h-[calc(100vh-48px)]')}
           >
             <Outlet />
           </div>

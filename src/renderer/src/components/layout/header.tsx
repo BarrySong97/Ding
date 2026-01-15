@@ -7,7 +7,6 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator
 } from '@/components/ui/breadcrumb'
-import { SidebarTrigger } from '@/components/ui/sidebar'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { findMenuItemByPath } from '@renderer/constants/menu'
 import { cn } from '@renderer/lib/utils'
@@ -124,11 +123,60 @@ export function Header() {
       return items
     }
 
-    // 3. Provider 页面
+    // 3. Upload History 页面
+    if (currentPath.startsWith('/my-uploads')) {
+      const uploadHistoryConfig = findRouteConfig('/my-uploads')
+
+      items.push(<BreadcrumbSeparator key="sep-upload-history" />)
+      items.push(
+        <BreadcrumbItem key="upload-history">
+          <div className={badgeStyle}>
+            {uploadHistoryConfig?.icon && <uploadHistoryConfig.icon size={16} />}
+            <span className={activeTextStyle}>{uploadHistoryConfig?.label}</span>
+          </div>
+        </BreadcrumbItem>
+      )
+
+      return items
+    }
+
+    // 4. Providers 列表页面
+    if (currentPath === '/providers') {
+      const providersConfig = findRouteConfig('/providers')
+
+      items.push(<BreadcrumbSeparator key="sep-providers" />)
+      items.push(
+        <BreadcrumbItem key="providers">
+          <div className={badgeStyle}>
+            {providersConfig?.icon && <providersConfig.icon size={16} />}
+            <span className={activeTextStyle}>{providersConfig?.label}</span>
+          </div>
+        </BreadcrumbItem>
+      )
+
+      return items
+    }
+
+    // 5. Provider 详情页面
     if (currentPath.startsWith('/provider/') && currentProvider) {
+      const providersConfig = findRouteConfig('/providers')
       const ProviderIcon = getProviderIcon(currentProvider.variant)
       const isLastItem = !currentBucket
 
+      // 先添加 Providers 链接
+      items.push(<BreadcrumbSeparator key="sep-providers" />)
+      items.push(
+        <BreadcrumbItem key="providers">
+          <BreadcrumbLink asChild>
+            <Link to="/providers" className={linkStyle}>
+              {providersConfig?.icon && <providersConfig.icon size={16} />}
+              <span>{providersConfig?.label}</span>
+            </Link>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+      )
+
+      // 再添加 Provider 名字
       items.push(<BreadcrumbSeparator key="sep-provider" />)
 
       if (isLastItem) {
@@ -217,11 +265,10 @@ export function Header() {
   return (
     <header
       className={cn(
-        'pl-2 pr-[140px] flex items-center gap-2 shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable',
+        'pr-[140px] flex items-center gap-2 shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22]   dark:border-[#333333] draggable ',
         window.api.platform.isMac ? 'pt-0 h-10 ' : 'h-12'
       )}
     >
-      <SidebarTrigger className="no-draggable" />
       <Breadcrumb>
         <BreadcrumbList>{renderBreadcrumbs()}</BreadcrumbList>
       </Breadcrumb>

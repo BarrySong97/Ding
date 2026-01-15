@@ -1,3 +1,3 @@
 export { PageLayout } from './page-layout'
-export { Sidebar } from './sidebar'
+export { AppSidebar } from './sidebar'
 export { Header } from './header'
