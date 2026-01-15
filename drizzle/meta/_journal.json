@@ -5,43 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1768113306750,
-      "tag": "0000_mushy_quicksilver",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1768122863554,
-      "tag": "0001_large_doctor_spectrum",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1768186815833,
-      "tag": "0002_real_famine",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1768196232781,
-      "tag": "0003_hesitant_agent_brand",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1768377371010,
-      "tag": "0004_romantic_enchantress",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1768395795973,
-      "tag": "0005_fat_starjammers",
+      "when": 1768448376160,
+      "tag": "0000_low_namora",
       "breakpoints": true
     }
   ]

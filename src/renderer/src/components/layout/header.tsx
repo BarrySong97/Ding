@@ -7,6 +7,7 @@ import {
   BreadcrumbLink,
   BreadcrumbSeparator
 } from '@/components/ui/breadcrumb'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { findMenuItemByPath } from '@renderer/constants/menu'
 import { cn } from '@renderer/lib/utils'
@@ -216,10 +217,11 @@ export function Header() {
   return (
     <header
       className={cn(
-        'pl-0 pr-[140px] flex items-center  shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable',
+        'pl-2 pr-[140px] flex items-center gap-2 shrink-0 bg-[#f2f8f3bf] dark:bg-[#1E1F22] border-b border-[#f2f8f7bf] dark:border-[#333333] draggable',
         window.api.platform.isMac ? 'pt-0 h-10 ' : 'h-12'
       )}
     >
+      <SidebarTrigger className="no-draggable" />
       <Breadcrumb>
         <BreadcrumbList>{renderBreadcrumbs()}</BreadcrumbList>
       </Breadcrumb>

@@ -1,83 +1,29 @@
 import { useState } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
-import { IconPlus, IconCloud, IconBrandAws } from '@tabler/icons-react'
-import { motion } from 'motion/react'
+import { IconPlus } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@renderer/lib/trpc'
-import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+  SidebarSeparator
+} from '@/components/ui/sidebar'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { MENU_ITEMS } from '@renderer/constants/menu'
+import { ProviderBrandIcon, getProviderIconKey } from '@/components/provider/brand-icon'
 
-// Active indicator component
-function ActiveIndicator({ height = 'h-9' }: { height?: string }) {
-  return (
-    <motion.div
-      layoutId="sidebar-indicator"
-      className={cn('absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-[#20a64b]', height)}
-      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-    />
-  )
-}
+// Maximum number of providers to show in sidebar
+const MAX_RECENT_PROVIDERS = 5
 
-// Sidebar menu button component
-interface SidebarMenuButtonProps {
-  to: string
-  params?: Record<string, string>
-  icon: React.ReactNode
-  label: string
-  isActive: boolean
-  indicatorHeight?: string
-  buttonClassName?: string
-}
-
-function SidebarMenuButton({
-  to,
-  params,
-  icon,
-  label,
-  isActive,
-  indicatorHeight = 'h-9',
-  buttonClassName = 'w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center bg-white text-slate-700 hover:bg-accent'
-}: SidebarMenuButtonProps) {
-  return (
-    <div className="relative group flex items-center justify-center w-full">
-      {isActive && <ActiveIndicator height={indicatorHeight} />}
-      <Link to={to} params={params} className={buttonClassName}>
-        {icon}
-      </Link>
-      <div className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md group-hover:block z-50">
-        {label}
-      </div>
-    </div>
-  )
-}
-
-// Provider icon colors based on variant
-function getProviderIconColor(variant?: string): string {
-  switch (variant) {
-    case 'aws-s3':
-      return 'text-orange-500'
-    case 'cloudflare-r2':
-      return 'text-orange-400'
-    case 'aliyun-oss':
-      return 'text-orange-500'
-    case 'tencent-cos':
-      return 'text-blue-500'
-    case 'minio':
-      return 'text-red-500'
-    default:
-      return 'text-slate-600 dark:text-slate-300'
-  }
-}
-
-function getProviderIcon(variant?: string) {
-  if (variant === 'aws-s3') {
-    return <IconBrandAws size={24} />
-  }
-  return <IconCloud size={24} />
-}
-
-export function Sidebar() {
+export function AppSidebar() {
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const { data: providers, isLoading } = trpc.provider.list.useQuery()
   const router = useRouterState()
@@ -88,102 +34,145 @@ export function Sidebar() {
   }
 
   const isDashboardActive = currentPath === '/'
-  const isMyUploadsActive = currentPath.startsWith('/my-uploads')
+  const isUploadHistoryActive = currentPath.startsWith('/my-uploads')
+  const isProvidersActive = currentPath === '/providers'
   const isSettingsActive = currentPath.startsWith('/settings')
 
   // Find active provider
   const activeProviderId = providers?.find((p) => isProviderActive(p.id))?.id
 
+  // Get recent providers (limit to MAX_RECENT_PROVIDERS)
+  const recentProviders = providers?.slice(0, MAX_RECENT_PROVIDERS) ?? []
+
   return (
-    <div
-      id="sidebar"
-      className={cn(
-        'relative overflow-hidden flex min-h-screen h-full w-[72px] flex-col items-center bg-[#f2f8f3bf] dark:bg-[#1E1F22] overflow-x-hidden py-3 gap-2',
-        window.api.platform.isMac && 'pt-[30px]'
-      )}
-    >
-      {/* Dashboard Button */}
-      <SidebarMenuButton
-        to={MENU_ITEMS.dashboard.path}
-        icon={<MENU_ITEMS.dashboard.icon size={24} />}
-        label={MENU_ITEMS.dashboard.label}
-        isActive={isDashboardActive}
-      />
+    <>
+      <Sidebar collapsible="icon" className="border-r-0">
+        {/* Mac drag area */}
+        <SidebarHeader
+          className={cn('p-0', window.api.platform.isMac && 'h-[30px] draggable')}
+        />
 
-      {/* Separator */}
-      <div className="h-[2px] w-8 bg-gray-300 rounded-lg mx-auto my-1 opacity-50" />
+        <SidebarContent className="bg-[#f2f8f3bf] dark:bg-[#1E1F22]">
+          {/* Main Navigation */}
+          <SidebarGroup>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={MENU_ITEMS.dashboard.label}
+                  isActive={isDashboardActive}
+                >
+                  <Link to={MENU_ITEMS.dashboard.path}>
+                    <MENU_ITEMS.dashboard.icon size={18} />
+                    <span>{MENU_ITEMS.dashboard.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-      {/* Provider List */}
-      <div className="flex-1 flex flex-col items-center gap-2 overflow-y-auto overflow-x-hidden w-full">
-        {isLoading ? (
-          <>
-            <Skeleton className="w-12 h-12 rounded-md" />
-            <Skeleton className="w-12 h-12 rounded-md" />
-          </>
-        ) : (
-          providers?.map((provider) => {
-            const variant = provider.type === 's3-compatible' ? provider.variant : undefined
-            const iconColor = getProviderIconColor(variant)
-            const isActive = provider.id === activeProviderId
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={MENU_ITEMS.providers.label}
+                  isActive={isProvidersActive}
+                >
+                  <Link to={MENU_ITEMS.providers.path}>
+                    <MENU_ITEMS.providers.icon size={18} />
+                    <span>{MENU_ITEMS.providers.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
-            return (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={MENU_ITEMS.uploadHistory.label}
+                  isActive={isUploadHistoryActive}
+                >
+                  <Link to={MENU_ITEMS.uploadHistory.path}>
+                    <MENU_ITEMS.uploadHistory.icon size={18} />
+                    <span>{MENU_ITEMS.uploadHistory.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+
+          <SidebarSeparator />
+
+          {/* Recent Providers */}
+          <SidebarGroup className="flex-1">
+            <SidebarGroupLabel>Recent Providers</SidebarGroupLabel>
+            <SidebarMenu>
+              {isLoading ? (
+                <>
+                  <SidebarMenuSkeleton showIcon />
+                  <SidebarMenuSkeleton showIcon />
+                </>
+              ) : (
+                recentProviders.map((provider) => {
+                  const iconKey = getProviderIconKey(provider)
+                  const isActive = provider.id === activeProviderId
+
+                  return (
+                    <SidebarMenuItem key={provider.id}>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={provider.name}
+                        isActive={isActive}
+                      >
+                        <Link
+                          to="/provider/$providerId"
+                          params={{ providerId: provider.id }}
+                        >
+                          <ProviderBrandIcon
+                            iconKey={iconKey}
+                            size={20}
+                            showBackground={false}
+                          />
+                          <span>{provider.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })
+              )}
+
+              {/* Add Provider Button */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Add Provider"
+                  onClick={() => setAddProviderOpen(true)}
+                  className="text-muted-foreground"
+                >
+                  <IconPlus size={18} />
+                  <span>Add Provider</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+
+        {/* Settings at bottom */}
+        <SidebarFooter className="bg-[#f2f8f3bf] dark:bg-[#1E1F22]">
+          <SidebarMenu>
+            <SidebarMenuItem>
               <SidebarMenuButton
-                key={provider.id}
-                to="/provider/$providerId"
-                params={{ providerId: provider.id }}
-                icon={getProviderIcon(variant)}
-                label={provider.name}
-                isActive={isActive}
-                buttonClassName={cn(
-                  'w-12 h-12 rounded-md transition-all overflow-hidden shadow-sm flex items-center justify-center',
-                  'bg-white hover:bg-accent',
-                  iconColor
-                )}
-              />
-            )
-          })
-        )}
-
-        {/* Add Provider Button */}
-        <div className="relative group flex items-center justify-center mt-2">
-          <button
-            onClick={() => setAddProviderOpen(true)}
-            className="w-12 h-12 rounded-md bg-white dark:bg-[#1E1E1E] text-slate-500 dark:text-slate-400 hover:bg-accent transition-all overflow-hidden shadow-sm flex items-center justify-center border border-dashed border-gray-300 dark:border-gray-600"
-          >
-            <IconPlus size={24} />
-          </button>
-          {/* Tooltip */}
-          <div className="pointer-events-none absolute left-full ml-3 hidden whitespace-nowrap rounded-lg bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md group-hover:block z-50">
-            Add Provider
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Menu Items */}
-      <div className="mt-auto mb-4 w-full space-y-2">
-        {/* My Uploads */}
-        <SidebarMenuButton
-          to={MENU_ITEMS.myUploads.path}
-          icon={<MENU_ITEMS.myUploads.icon size={20} />}
-          label={MENU_ITEMS.myUploads.label}
-          isActive={isMyUploadsActive}
-          indicatorHeight="h-7"
-          buttonClassName="w-10 h-10 rounded-md transition-colors flex items-center justify-center bg-white text-gray-500 dark:text-gray-400 hover:bg-accent"
-        />
-
-        {/* Settings */}
-        <SidebarMenuButton
-          to={MENU_ITEMS.settings.path}
-          icon={<MENU_ITEMS.settings.icon size={20} />}
-          label={MENU_ITEMS.settings.label}
-          isActive={isSettingsActive}
-          indicatorHeight="h-7"
-          buttonClassName="w-10 h-10 rounded-md transition-colors flex items-center justify-center bg-white text-gray-500 dark:text-gray-400 hover:bg-accent"
-        />
-      </div>
+                asChild
+                tooltip={MENU_ITEMS.settings.label}
+                isActive={isSettingsActive}
+              >
+                <Link to={MENU_ITEMS.settings.path}>
+                  <MENU_ITEMS.settings.icon size={18} />
+                  <span>{MENU_ITEMS.settings.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      </Sidebar>
 
       {/* Add Provider Dialog */}
       <AddProviderDialog open={addProviderOpen} onOpenChange={setAddProviderOpen} />
-    </div>
+    </>
   )
 }

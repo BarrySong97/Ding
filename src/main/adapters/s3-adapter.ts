@@ -12,7 +12,7 @@ import {
   type BucketLocationConstraint
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import type { S3Provider } from '@shared/schema/provider'
+import type { S3CompatibleProvider } from '@shared/schema/provider'
 import type {
   StorageAdapter,
   ConnectionResult,
@@ -31,24 +31,18 @@ import type {
 
 // ============ S3 Configuration ============
 
-function getS3Endpoint(provider: S3Provider): string | undefined {
+function getS3Endpoint(provider: S3CompatibleProvider): string | undefined {
   if (provider.endpoint) {
     return provider.endpoint
   }
 
-  switch (provider.variant) {
+  switch (provider.type) {
     case 'aws-s3':
       return provider.region ? `https://s3.${provider.region}.amazonaws.com` : undefined
-    case 'aliyun-oss':
-      return provider.region ? `https://${provider.region}.aliyuncs.com` : undefined
-    case 'tencent-cos':
-      return provider.region ? `https://cos.${provider.region}.myqcloud.com` : undefined
     case 'cloudflare-r2':
       return provider.accountId
         ? `https://${provider.accountId}.r2.cloudflarestorage.com`
         : undefined
-    case 'backblaze-b2':
-      return provider.region ? `https://s3.${provider.region}.backblazeb2.com` : undefined
     case 'minio':
       return undefined
     default:
@@ -86,9 +80,9 @@ function getMimeType(filename: string): string | undefined {
 
 export class S3Adapter implements StorageAdapter {
   private client: S3Client
-  private provider: S3Provider
+  private provider: S3CompatibleProvider
 
-  constructor(provider: S3Provider) {
+  constructor(provider: S3CompatibleProvider) {
     this.provider = provider
     const endpoint = getS3Endpoint(provider)
 
@@ -99,7 +93,7 @@ export class S3Adapter implements StorageAdapter {
         accessKeyId: provider.accessKeyId,
         secretAccessKey: provider.secretAccessKey
       },
-      forcePathStyle: provider.variant !== 'aws-s3'
+      forcePathStyle: provider.type !== 'aws-s3'
     })
   }
 
@@ -239,7 +233,7 @@ export class S3Adapter implements StorageAdapter {
         contentType: metadata?.contentType,
         bufferSize: content.length,
         provider: {
-          variant: this.provider.variant,
+          type: this.provider.type,
           region: this.provider.region,
           endpoint: getS3Endpoint(this.provider)
         }

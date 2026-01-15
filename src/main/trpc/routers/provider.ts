@@ -73,7 +73,7 @@ export const providerRouter = router({
         // Skip providers that fail to connect
       }
 
-      if (provider.type === 's3-compatible' && provider.region) {
+      if (provider.type !== 'supabase' && 'region' in provider && provider.region) {
         uniqueRegions.add(provider.region)
       }
     }

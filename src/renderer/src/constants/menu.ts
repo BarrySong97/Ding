@@ -3,7 +3,8 @@ import {
   IconSettings,
   IconFolder,
   IconPhoto,
-  IconUpload
+  IconUpload,
+  IconCloud
 } from '@tabler/icons-react'
 
 // 菜单项类型定义
@@ -22,11 +23,17 @@ export const MENU_ITEMS = {
     label: 'Dashboard',
     icon: IconLayoutDashboard
   },
-  myUploads: {
-    id: 'my-uploads',
+  uploadHistory: {
+    id: 'upload-history',
     path: '/my-uploads',
-    label: 'My Uploads',
+    label: 'Upload History',
     icon: IconUpload
+  },
+  providers: {
+    id: 'providers',
+    path: '/providers',
+    label: 'Providers',
+    icon: IconCloud
   },
   settings: {
     id: 'settings',

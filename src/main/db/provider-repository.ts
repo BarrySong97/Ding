@@ -1,75 +1,73 @@
-import { eq } from 'drizzle-orm'
+import { eq, desc, sql } from 'drizzle-orm'
 import { getDatabase, schema } from './index'
 import type {
   Provider,
-  S3Provider,
+  S3CompatibleProvider,
   SupabaseProvider,
   AddProviderForm
 } from '@shared/schema/provider'
 import type { ProviderRecord, NewProviderRecord } from './schema'
 
+// S3-compatible types
+const s3CompatibleTypes = ['aws-s3', 'cloudflare-r2', 'minio', 'aliyun-oss', 'tencent-cos'] as const
+
+function isS3Compatible(type: string): type is (typeof s3CompatibleTypes)[number] {
+  return s3CompatibleTypes.includes(type as (typeof s3CompatibleTypes)[number])
+}
+
 // Helper function to map DB record to Provider type
 function mapRecordToProvider(record: ProviderRecord): Provider {
-  if (record.type === 's3-compatible') {
+  if (record.type === 'supabase') {
     return {
       id: record.id,
       name: record.name,
-      type: 's3-compatible',
-      variant: record.variant!,
-      accessKeyId: record.accessKeyId!,
-      secretAccessKey: record.secretAccessKey!,
-      region: record.region ?? undefined,
-      endpoint: record.endpoint ?? undefined,
-      bucket: record.bucket ?? undefined,
-      accountId: record.accountId ?? undefined,
-      createdAt: record.createdAt!,
-      updatedAt: record.updatedAt!,
-      lastOperationAt: record.lastOperationAt ?? null
-    } as S3Provider
-  } else {
-    return {
-      id: record.id,
-      name: record.name,
-      type: 'supabase-storage',
+      type: 'supabase',
       projectUrl: record.projectUrl!,
       anonKey: record.anonKey ?? undefined,
       serviceRoleKey: record.serviceRoleKey ?? undefined,
       bucket: record.bucket ?? undefined,
       createdAt: record.createdAt!,
       updatedAt: record.updatedAt!,
-      lastOperationAt: record.lastOperationAt ?? null
+      lastOperationAt: record.lastOperationAt ?? undefined
     } as SupabaseProvider
   }
+
+  // S3-compatible providers (aws-s3, cloudflare-r2, minio, aliyun-oss, tencent-cos)
+  const base = {
+    id: record.id,
+    name: record.name,
+    type: record.type,
+    accessKeyId: record.accessKeyId!,
+    secretAccessKey: record.secretAccessKey!,
+    region: record.region ?? undefined,
+    endpoint: record.endpoint ?? undefined,
+    bucket: record.bucket ?? undefined,
+    createdAt: record.createdAt!,
+    updatedAt: record.updatedAt!,
+    lastOperationAt: record.lastOperationAt ?? undefined
+  }
+
+  // Add accountId for Cloudflare R2
+  if (record.type === 'cloudflare-r2') {
+    return {
+      ...base,
+      accountId: record.accountId ?? undefined
+    } as S3CompatibleProvider
+  }
+
+  return base as S3CompatibleProvider
 }
 
 // Helper function to map Provider to DB record (without timestamps - let DB handle them)
 function mapProviderToRecord(
   provider: Omit<Provider, 'createdAt' | 'updatedAt'>
 ): Omit<NewProviderRecord, 'createdAt' | 'updatedAt'> {
-  if (provider.type === 's3-compatible') {
-    const s3Provider = provider as Omit<S3Provider, 'createdAt' | 'updatedAt'>
-    return {
-      id: s3Provider.id,
-      name: s3Provider.name,
-      type: 's3-compatible',
-      variant: s3Provider.variant,
-      accessKeyId: s3Provider.accessKeyId,
-      secretAccessKey: s3Provider.secretAccessKey,
-      region: s3Provider.region ?? null,
-      endpoint: s3Provider.endpoint ?? null,
-      bucket: s3Provider.bucket ?? null,
-      accountId: s3Provider.accountId ?? null,
-      projectUrl: null,
-      anonKey: null,
-      serviceRoleKey: null
-    }
-  } else {
+  if (provider.type === 'supabase') {
     const supabaseProvider = provider as Omit<SupabaseProvider, 'createdAt' | 'updatedAt'>
     return {
       id: supabaseProvider.id,
       name: supabaseProvider.name,
-      type: 'supabase-storage',
-      variant: null,
+      type: 'supabase',
       accessKeyId: null,
       secretAccessKey: null,
       region: null,
@@ -81,12 +79,36 @@ function mapProviderToRecord(
       serviceRoleKey: supabaseProvider.serviceRoleKey ?? null
     }
   }
+
+  // S3-compatible providers
+  const s3Provider = provider as Omit<S3CompatibleProvider, 'createdAt' | 'updatedAt'>
+  const accountId =
+    'accountId' in s3Provider && typeof s3Provider.accountId === 'string'
+      ? s3Provider.accountId
+      : null
+  return {
+    id: s3Provider.id,
+    name: s3Provider.name,
+    type: s3Provider.type,
+    accessKeyId: s3Provider.accessKeyId,
+    secretAccessKey: s3Provider.secretAccessKey,
+    region: s3Provider.region ?? null,
+    endpoint: s3Provider.endpoint ?? null,
+    bucket: s3Provider.bucket ?? null,
+    accountId,
+    projectUrl: null,
+    anonKey: null,
+    serviceRoleKey: null
+  }
 }
 
 export const providerRepository = {
   async findAll(): Promise<Provider[]> {
     const db = getDatabase()
-    const records = await db.select().from(schema.providers)
+    const records = await db
+      .select()
+      .from(schema.providers)
+      .orderBy(desc(sql`COALESCE(${schema.providers.lastOperationAt}, ${schema.providers.createdAt})`))
     return records.map(mapRecordToProvider)
   },
 
@@ -118,15 +140,16 @@ export const providerRepository = {
     if (data.name !== undefined) updateData.name = data.name
     if (data.bucket !== undefined) updateData.bucket = data.bucket ?? null
 
-    if (data.type === 's3-compatible') {
-      const s3Data = data as Partial<S3Provider>
-      if (s3Data.variant !== undefined) updateData.variant = s3Data.variant
+    if (data.type && isS3Compatible(data.type)) {
+      const s3Data = data as Partial<S3CompatibleProvider>
       if (s3Data.accessKeyId !== undefined) updateData.accessKeyId = s3Data.accessKeyId
       if (s3Data.secretAccessKey !== undefined) updateData.secretAccessKey = s3Data.secretAccessKey
       if (s3Data.region !== undefined) updateData.region = s3Data.region ?? null
       if (s3Data.endpoint !== undefined) updateData.endpoint = s3Data.endpoint ?? null
-      if (s3Data.accountId !== undefined) updateData.accountId = s3Data.accountId ?? null
-    } else if (data.type === 'supabase-storage') {
+      if ('accountId' in s3Data && s3Data.accountId !== undefined) {
+        updateData.accountId = s3Data.accountId ?? null
+      }
+    } else if (data.type === 'supabase') {
       const supabaseData = data as Partial<SupabaseProvider>
       if (supabaseData.projectUrl !== undefined) updateData.projectUrl = supabaseData.projectUrl
       if (supabaseData.anonKey !== undefined) updateData.anonKey = supabaseData.anonKey ?? null

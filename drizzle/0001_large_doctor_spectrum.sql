@@ -1,1 +1,0 @@
-ALTER TABLE "providers" ADD COLUMN "last_operation_at" timestamp with time zone;

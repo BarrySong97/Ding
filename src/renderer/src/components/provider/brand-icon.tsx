@@ -1,4 +1,6 @@
 import type { SVGProps } from 'react'
+import { IconCloud } from '@tabler/icons-react'
+import { cn } from '@/lib/utils'
 
 export function DeviconAmazonwebservices(props: SVGProps<SVGSVGElement>) {
   return (
@@ -116,4 +118,130 @@ export function DeviconSupabase(props: SVGProps<SVGSVGElement>) {
       />
     </svg>
   )
+}
+
+// MinIO icon
+export function SimpleIconsMinio(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="1em"
+      height="1em"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <path
+        fill="currentColor"
+        d="M2.637 16.328c-.268-.074-.46-.156-.64-.272a1.26 1.26 0 0 1-.397-.397c-.19-.318-.19-.715 0-1.033l4.54-7.863c.19-.318.53-.513.897-.513h9.926c.367 0 .707.195.897.513l4.54 7.863c.19.318.19.715 0 1.033a1.26 1.26 0 0 1-.397.397c-.18.116-.372.198-.64.272l-9.363 2.58-9.363-2.58zm9.363.907l7.5-2.067-3.5-6.062H8l-3.5 6.062 7.5 2.067z"
+      />
+    </svg>
+  )
+}
+
+// Tencent Cloud icon
+export function TencentCloudIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="1em"
+      height="1em"
+      viewBox="0 0 24 24"
+      {...props}
+    >
+      <path
+        fill="currentColor"
+        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm4 0h-2v-6h2v6zm0-8H9V7h6v2z"
+      />
+    </svg>
+  )
+}
+
+// Provider icon key type
+export type ProviderIconKey =
+  | 'aws-s3'
+  | 'cloudflare-r2'
+  | 'aliyun-oss'
+  | 'tencent-cos'
+  | 'minio'
+  | 'backblaze-b2'
+  | 'supabase'
+  | 'default'
+
+// Icon mapping
+const PROVIDER_ICONS: Record<ProviderIconKey, React.ComponentType<SVGProps<SVGSVGElement>>> = {
+  'aws-s3': DeviconAmazonwebservices,
+  'cloudflare-r2': VscodeIconsFileTypeCloudflare,
+  'aliyun-oss': AntDesignAliyunOutlined,
+  'tencent-cos': TencentCloudIcon,
+  minio: SimpleIconsMinio,
+  'backblaze-b2': IconCloud as React.ComponentType<SVGProps<SVGSVGElement>>,
+  supabase: DeviconSupabase,
+  default: IconCloud as React.ComponentType<SVGProps<SVGSVGElement>>
+}
+
+// Background color mapping
+const PROVIDER_BG_COLORS: Record<ProviderIconKey, string> = {
+  'aws-s3': 'bg-orange-100',
+  'cloudflare-r2': 'bg-orange-50',
+  'aliyun-oss': 'bg-orange-100 text-orange-600',
+  'tencent-cos': 'bg-blue-100 text-blue-600',
+  minio: 'bg-red-100 text-red-600',
+  'backblaze-b2': 'bg-red-100 text-red-600',
+  supabase: 'bg-emerald-100 text-emerald-600',
+  default: 'bg-muted text-muted-foreground'
+}
+
+interface ProviderBrandIconProps {
+  /** Provider variant or type key */
+  iconKey?: string
+  /** Icon size */
+  size?: number
+  /** Additional class name */
+  className?: string
+  /** Whether to show background */
+  showBackground?: boolean
+}
+
+/**
+ * Provider brand icon component
+ * Displays the appropriate brand icon based on the provider variant/type
+ */
+export function ProviderBrandIcon({
+  iconKey,
+  size = 24,
+  className,
+  showBackground = true
+}: ProviderBrandIconProps) {
+  const key = (iconKey || 'default') as ProviderIconKey
+  const IconComponent = PROVIDER_ICONS[key] || PROVIDER_ICONS.default
+  const bgColor = PROVIDER_BG_COLORS[key] || PROVIDER_BG_COLORS.default
+
+  if (showBackground) {
+    return (
+      <div
+        className={cn(
+          'flex items-center justify-center rounded-lg',
+          bgColor,
+          className
+        )}
+        style={{ width: size + 16, height: size + 16 }}
+      >
+        <IconComponent width={size} height={size} />
+      </div>
+    )
+  }
+
+  return <IconComponent width={size} height={size} className={className} />
+}
+
+/**
+ * Get provider icon key from provider data
+ */
+export function getProviderIconKey(provider: {
+  type: string
+}): ProviderIconKey {
+  if (provider.type in PROVIDER_ICONS) {
+    return provider.type as ProviderIconKey
+  }
+  return 'default'
 }

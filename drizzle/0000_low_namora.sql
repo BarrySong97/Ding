@@ -1,3 +1,35 @@
+CREATE TYPE "public"."provider_type" AS ENUM('aws-s3', 'cloudflare-r2', 'minio', 'aliyun-oss', 'tencent-cos', 'supabase');--> statement-breakpoint
+CREATE TABLE "compression_presets" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"max_width" integer NOT NULL,
+	"max_height" integer NOT NULL,
+	"quality" integer NOT NULL,
+	"format" text NOT NULL,
+	"fit" text NOT NULL,
+	"aspect_ratio" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "providers" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"type" "provider_type" NOT NULL,
+	"access_key_id" text,
+	"secret_access_key" text,
+	"region" text,
+	"endpoint" text,
+	"bucket" text,
+	"account_id" text,
+	"project_url" text,
+	"anon_key" text,
+	"service_role_key" text,
+	"created_at" timestamp with time zone DEFAULT now(),
+	"updated_at" timestamp with time zone DEFAULT now(),
+	"last_operation_at" timestamp with time zone
+);
+--> statement-breakpoint
 CREATE TABLE "upload_history" (
 	"id" text PRIMARY KEY NOT NULL,
 	"provider_id" text NOT NULL,

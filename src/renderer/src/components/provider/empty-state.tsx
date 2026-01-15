@@ -1,13 +1,13 @@
 import { IconCloudUpload, IconBrandAws, IconCloud, IconPlus } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
-import type { S3Variant } from '@renderer/db'
+import type { ProviderType } from '@renderer/db'
 
 interface EmptyStateProps {
-  onAddProvider: (variant?: S3Variant) => void
+  onAddProvider: (type?: ProviderType) => void
 }
 
 const quickProviders: {
-  variant: S3Variant
+  type: ProviderType
   name: string
   subtitle: string
   icon: React.ReactNode
@@ -15,7 +15,7 @@ const quickProviders: {
   borderColor: string
 }[] = [
   {
-    variant: 'cloudflare-r2',
+    type: 'cloudflare-r2',
     name: 'Cloudflare R2',
     subtitle: 'S3 Compatible',
     icon: <IconCloud size={36} />,
@@ -23,7 +23,7 @@ const quickProviders: {
     borderColor: 'hover:border-orange-400 dark:hover:border-orange-500'
   },
   {
-    variant: 'aws-s3',
+    type: 'aws-s3',
     name: 'AWS S3',
     subtitle: 'Standard',
     icon: <IconBrandAws size={36} />,
@@ -31,7 +31,7 @@ const quickProviders: {
     borderColor: 'hover:border-[#FF9900]'
   },
   {
-    variant: 'tencent-cos',
+    type: 'tencent-cos',
     name: 'Tencent COS',
     subtitle: 'Cloud Storage',
     icon: <IconCloud size={36} />,
@@ -39,7 +39,7 @@ const quickProviders: {
     borderColor: 'hover:border-blue-500 dark:hover:border-blue-400'
   },
   {
-    variant: 'aliyun-oss',
+    type: 'aliyun-oss',
     name: 'Aliyun OSS',
     subtitle: 'Object Storage',
     icon: <IconCloud size={36} />,
@@ -86,8 +86,8 @@ export function EmptyState({ onAddProvider }: EmptyStateProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {quickProviders.map((provider) => (
               <button
-                key={provider.variant}
-                onClick={() => onAddProvider(provider.variant)}
+                key={provider.type}
+                onClick={() => onAddProvider(provider.type)}
                 className={cn(
                   'group bg-white dark:bg-[#1E1E1E] p-6 rounded-xl border border-gray-200 dark:border-[#333]',
                   'hover:shadow-md hover:-translate-y-0.5 transition-all duration-200',

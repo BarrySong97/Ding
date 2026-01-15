@@ -1,63 +1,36 @@
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { IconChevronRight, IconCloud, IconBrandAws, IconServer } from '@tabler/icons-react'
+import { IconChevronRight, IconDotsVertical } from '@tabler/icons-react'
 import type { TRPCProvider } from '@renderer/lib/trpc'
+import { trpc } from '@renderer/lib/trpc'
 import { useProviderStatus } from '@renderer/hooks/use-provider-status'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
+import { ProviderSettingsDialog } from './provider-settings-dialog'
+import { ProviderBrandIcon, getProviderIconKey } from './brand-icon'
 
 interface ProviderCardProps {
   provider: TRPCProvider
 }
 
-const variantLabels: Record<string, string> = {
+const providerTypeLabels: Record<string, string> = {
   'aws-s3': 'AWS S3',
-  'aliyun-oss': 'Aliyun OSS',
-  'tencent-cos': 'Tencent COS',
   'cloudflare-r2': 'Cloudflare R2',
   minio: 'MinIO',
-  'backblaze-b2': 'Backblaze B2'
-}
-
-function getProviderIcon(provider: TRPCProvider) {
-  if (provider.type === 'supabase-storage') {
-    return <IconCloud size={24} />
-  }
-
-  switch (provider.variant) {
-    case 'aws-s3':
-      return <IconBrandAws size={24} />
-    case 'minio':
-      return <IconServer size={24} />
-    default:
-      return <IconCloud size={24} />
-  }
-}
-
-function getProviderIconBgColor(provider: TRPCProvider): string {
-  if (provider.type === 'supabase-storage') {
-    return 'bg-emerald-100 text-emerald-600'
-  }
-
-  switch (provider.variant) {
-    case 'aws-s3':
-      return 'bg-orange-100 text-orange-600'
-    case 'cloudflare-r2':
-      return 'bg-orange-50 text-orange-500'
-    case 'aliyun-oss':
-      return 'bg-orange-100 text-orange-600'
-    case 'tencent-cos':
-      return 'bg-blue-100 text-blue-600'
-    case 'minio':
-      return 'bg-red-100 text-red-600'
-    default:
-      return 'bg-muted text-muted-foreground'
-  }
+  'aliyun-oss': 'Aliyun OSS',
+  'tencent-cos': 'Tencent COS',
+  supabase: 'Supabase Storage'
 }
 
 function getProviderTypeLabel(provider: TRPCProvider): string {
-  if (provider.type === 'supabase-storage') {
-    return 'Supabase Storage'
-  }
-  return variantLabels[provider.variant] || provider.variant
+  return providerTypeLabels[provider.type] || provider.type
 }
 
 function formatLastOperation(date: Date | string | null | undefined): string {
@@ -80,73 +53,136 @@ function formatLastOperation(date: Date | string | null | undefined): string {
 }
 
 export function ProviderCard({ provider }: ProviderCardProps) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const { isLoading, isConnected, stats } = useProviderStatus(provider)
+  const utils = trpc.useUtils()
+
+  const deleteMutation = trpc.provider.delete.useMutation({
+    onSuccess: () => {
+      utils.provider.list.invalidate()
+    }
+  })
 
   const region =
-    provider.type === 's3-compatible' ? provider.region : new URL(provider.projectUrl).hostname
+    provider.type === 'supabase' && provider.projectUrl
+      ? new URL(provider.projectUrl).hostname
+      : 'region' in provider
+        ? provider.region
+        : undefined
 
   const statusText = isLoading ? 'Checking...' : isConnected ? 'Connected' : 'Paused'
 
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete "${provider.name}"? This action cannot be undone.`)) {
+      deleteMutation.mutate({ id: provider.id })
+    }
+  }
+
+  const iconKey = getProviderIconKey(provider)
+
   return (
-    <Link to="/provider/$providerId" params={{ providerId: provider.id }} className="block">
-      <div className="rounded-md border border-border bg-white dark:bg-[#1E1E1E] p-4 transition-colors hover:bg-accent/30">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-lg',
-                getProviderIconBgColor(provider)
-              )}
-            >
-              {getProviderIcon(provider)}
+    <>
+      <Link to="/provider/$providerId" params={{ providerId: provider.id }} className="block group">
+        <div className="relative rounded-md border border-border bg-white dark:bg-[#1E1E1E] p-4 transition-colors hover:bg-accent/30">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ProviderBrandIcon iconKey={iconKey} size={24} />
+              <div>
+                <div className="font-medium">{provider.name}</div>
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <span
+                    className={cn(
+                      'inline-block h-1.5 w-1.5 rounded-full',
+                      isLoading
+                        ? 'bg-yellow-500 animate-pulse'
+                        : isConnected
+                          ? 'bg-green-500'
+                          : 'bg-muted-foreground'
+                    )}
+                  />
+                  <span>{statusText}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono">
+                {region || 'Region:auto'}
+              </span>
+              <IconChevronRight size={16} />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="my-8 h-px bg-border/50" />
+
+          {/* Stats */}
+          <div className="flex gap-8">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Provider
+              </div>
+              <div className="mt-0.5 text-lg font-semibold">{getProviderTypeLabel(provider)}</div>
             </div>
             <div>
-              <div className="font-medium">{getProviderTypeLabel(provider)}</div>
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span
-                  className={cn(
-                    'inline-block h-1.5 w-1.5 rounded-full',
-                    isLoading
-                      ? 'bg-yellow-500 animate-pulse'
-                      : isConnected
-                        ? 'bg-green-500'
-                        : 'bg-muted-foreground'
-                  )}
-                />
-                <span>{statusText}</span>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Buckets
+              </div>
+              <div className="mt-0.5 text-lg font-semibold">{stats?.bucketCount ?? 0}</div>
+            </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Last Operation
+              </div>
+              <div className="mt-0.5 text-lg font-semibold">
+                {formatLastOperation(provider.lastOperationAt)}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-mono">
-              {region || 'Region:auto'}
-            </span>
-            <IconChevronRight size={16} />
+
+          {/* Dropdown Menu - appears on hover */}
+          <div className="absolute bottom-4 right-4 opacity-0 transition-opacity group-hover:opacity-100">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <IconDotsVertical size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setSettingsOpen(true)
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    handleDelete()
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
+      </Link>
 
-        {/* Divider */}
-        <div className="my-8 h-px bg-border/50" />
-
-        {/* Stats */}
-        <div className="flex gap-8">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Buckets
-            </div>
-            <div className="mt-0.5 text-lg font-semibold">{stats?.bucketCount ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Last Operation
-            </div>
-            <div className="mt-0.5 text-lg font-semibold">
-              {formatLastOperation(provider.lastOperationAt)}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Link>
+      <ProviderSettingsDialog
+        provider={provider}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
+    </>
   )
 }

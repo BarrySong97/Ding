@@ -1,17 +1,14 @@
 import { pgTable, text, timestamp, pgEnum, integer, boolean, index } from 'drizzle-orm/pg-core'
 
-// S3 Provider variants
-export const s3VariantEnum = pgEnum('s3_variant', [
+// Provider types
+export const providerTypeEnum = pgEnum('provider_type', [
   'aws-s3',
-  'aliyun-oss',
-  'tencent-cos',
   'cloudflare-r2',
   'minio',
-  'backblaze-b2'
+  'aliyun-oss',
+  'tencent-cos',
+  'supabase'
 ])
-
-// Provider types
-export const providerTypeEnum = pgEnum('provider_type', ['s3-compatible', 'supabase-storage'])
 
 // Providers table
 export const providers = pgTable('providers', {
@@ -19,14 +16,13 @@ export const providers = pgTable('providers', {
   name: text('name').notNull(),
   type: providerTypeEnum('type').notNull(),
 
-  // S3 fields
-  variant: s3VariantEnum('variant'),
+  // S3-compatible fields (aws-s3, cloudflare-r2, minio)
   accessKeyId: text('access_key_id'),
   secretAccessKey: text('secret_access_key'),
   region: text('region'),
   endpoint: text('endpoint'),
   bucket: text('bucket'),
-  accountId: text('account_id'),
+  accountId: text('account_id'), // R2 专用
 
   // Supabase fields
   projectUrl: text('project_url'),
