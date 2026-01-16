@@ -5,7 +5,10 @@ import {
   IconFolder,
   IconWorld,
   IconChevronRight,
-  IconUpload
+  IconUpload,
+  IconCopy,
+  IconCheck,
+  IconDownload
 } from '@tabler/icons-react'
 import { format } from 'date-fns'
 import { type ProviderType } from '@renderer/db'
@@ -13,6 +16,8 @@ import { EmptyState } from '@/components/provider/empty-state'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
 import { ProviderCard } from '@/components/provider/provider-card'
 import { AddProviderCard } from '@/components/provider/add-provider-card'
+import { FileDetailSheet } from '@/components/provider/file-detail-sheet'
+import type { FileItem } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -23,12 +28,14 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatCard } from '@/components/dashboard/status-card'
 import { PageLayout } from '@/components/layout/page-layout'
 import { formatFileSize } from '@/lib/utils'
 import { getFileIcon } from '@/lib/file-utils'
+import { toast } from '@/hooks/use-toast'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -40,8 +47,21 @@ const MAX_DASHBOARD_PROVIDERS = 5
 function Index() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedType, setSelectedType] = useState<ProviderType | undefined>()
+  // File detail drawer state
+  const [fileDetailOpen, setFileDetailOpen] = useState(false)
+  const [selectedFileDetail, setSelectedFileDetail] = useState<{
+    file: FileItem
+    provider: TRPCProvider
+    bucket: string
+  } | null>(null)
+
   const { data: providers, isLoading } = trpc.provider.list.useQuery()
   const { data: globalStats } = trpc.provider.getGlobalStats.useQuery()
+  const trpcUtils = trpc.useUtils()
+
+  // Download mutations
+  const showSaveDialogMutation = trpc.provider.showSaveDialog.useMutation()
+  const downloadToFileMutation = trpc.provider.downloadToFile.useMutation()
 
   // Fetch recent uploads
   const { data: recentUploads } = trpc.uploadHistory.list.useQuery({
@@ -60,6 +80,129 @@ function Index() {
     setDialogOpen(open)
     if (!open) {
       setSelectedType(undefined)
+    }
+  }
+
+  const handleRowClick = async (item: {
+    id: string
+    providerId: string
+    bucket: string
+    key: string
+    name: string
+    type: 'file' | 'folder'
+    size?: number | null
+    mimeType?: string | null
+    uploadedAt: string
+  }) => {
+    try {
+      const provider = await trpcUtils.provider.getById.fetch({ id: item.providerId })
+      if (!provider) {
+        toast({
+          title: 'Error',
+          description: 'Provider not found for this file.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const file: FileItem = {
+        id: item.key,
+        name: item.name,
+        type: item.type,
+        size: item.size ?? undefined,
+        modified: new Date(item.uploadedAt),
+        mimeType: item.mimeType ?? undefined
+      }
+
+      setSelectedFileDetail({ file, provider, bucket: item.bucket })
+      setFileDetailOpen(true)
+    } catch (error) {
+      console.error('Failed to open file details:', error)
+    }
+  }
+
+  const getCopyUrl = async (providerId: string, bucket: string, key: string): Promise<string> => {
+    try {
+      const provider = await trpcUtils.provider.getById.fetch({ id: providerId })
+      if (!provider) {
+        toast({
+          title: 'Error',
+          description: 'Provider not found.',
+          variant: 'destructive'
+        })
+        return ''
+      }
+
+      const result = await trpcUtils.provider.getPlainObjectUrl.fetch({
+        provider,
+        bucket,
+        key
+      })
+
+      return result.url || ''
+    } catch (error) {
+      console.error('Failed to get URL:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to get URL.',
+        variant: 'destructive'
+      })
+      return ''
+    }
+  }
+
+  const handleDownload = async (
+    e: React.MouseEvent,
+    providerId: string,
+    bucket: string,
+    key: string,
+    fileName: string
+  ) => {
+    e.stopPropagation()
+    try {
+      const provider = await trpcUtils.provider.getById.fetch({ id: providerId })
+      if (!provider) {
+        toast({
+          title: 'Download failed',
+          description: 'Provider not found',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const dialogResult = await showSaveDialogMutation.mutateAsync({
+        defaultName: fileName
+      })
+
+      if (dialogResult.canceled || !dialogResult.filePath) {
+        return
+      }
+
+      const downloadResult = await downloadToFileMutation.mutateAsync({
+        provider,
+        bucket,
+        key,
+        savePath: dialogResult.filePath
+      })
+
+      if (downloadResult.success) {
+        toast({
+          title: 'Download complete',
+          description: `File saved to ${downloadResult.filePath}`
+        })
+      } else {
+        toast({
+          title: 'Download failed',
+          description: downloadResult.error || 'An unknown error occurred',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Download failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive'
+      })
     }
   }
 
@@ -189,46 +332,19 @@ function Index() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Uploaded
                   </TableHead>
+                  <TableHead className="w-16" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentUploads.data.map((item) => {
-                  const fileIcon = getFileIcon(
-                    {
-                      name: item.name,
-                      type: item.type as 'file' | 'folder',
-                      id: item.id,
-                      modified: new Date(),
-                      size: item.size || 0
-                    },
-                    'small'
-                  )
-
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0">{fileIcon}</div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{item.name}</span>
-                            {item.isCompressed && (
-                              <Badge variant="secondary" className="text-xs">
-                                Compressed
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{item.bucket}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {item.size ? formatFileSize(item.size) : '-'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                {recentUploads.data.map((item) => (
+                  <RecentUploadRow
+                    key={item.id}
+                    item={item}
+                    onRowClick={handleRowClick}
+                    onDownload={handleDownload}
+                    onCopyUrl={getCopyUrl}
+                  />
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -248,6 +364,114 @@ function Index() {
         onOpenChange={handleDialogClose}
         defaultType={selectedType}
       />
+
+      {/* File Detail Sheet */}
+      <FileDetailSheet
+        open={fileDetailOpen}
+        onOpenChange={setFileDetailOpen}
+        file={selectedFileDetail?.file ?? null}
+        provider={selectedFileDetail?.provider ?? ({} as TRPCProvider)}
+        bucket={selectedFileDetail?.bucket ?? ''}
+      />
     </PageLayout>
+  )
+}
+
+// Extract row component to use hooks
+interface RecentUploadRowProps {
+  item: {
+    id: string
+    providerId: string
+    bucket: string
+    key: string
+    name: string
+    type: 'file' | 'folder'
+    size?: number | null
+    mimeType?: string | null
+    uploadedAt: string
+    isCompressed?: boolean | null
+  }
+  onRowClick: (item: RecentUploadRowProps['item']) => void
+  onDownload: (
+    e: React.MouseEvent,
+    providerId: string,
+    bucket: string,
+    key: string,
+    fileName: string
+  ) => void
+  onCopyUrl: (providerId: string, bucket: string, key: string) => Promise<string>
+}
+
+function RecentUploadRow({ item, onRowClick, onDownload, onCopyUrl }: RecentUploadRowProps) {
+  const { copied, copyToClipboard } = useCopyToClipboard()
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const url = await onCopyUrl(item.providerId, item.bucket, item.key)
+    if (url) {
+      await copyToClipboard(url)
+    }
+  }
+
+  const fileIcon = getFileIcon(
+    {
+      name: item.name,
+      type: item.type as 'file' | 'folder',
+      id: item.id,
+      modified: new Date(),
+      size: item.size || 0
+    },
+    'small'
+  )
+
+  return (
+    <TableRow className="group cursor-pointer" onClick={() => onRowClick(item)}>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0">{fileIcon}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{item.name}</span>
+            {item.isCompressed && (
+              <Badge variant="secondary" className="text-xs">
+                Compressed
+              </Badge>
+            )}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground">{item.bucket}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {item.size ? formatFileSize(item.size) : '-'}
+      </TableCell>
+      <TableCell className="text-muted-foreground">
+        {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
+      </TableCell>
+      <TableCell>
+        {item.type === 'file' && (
+          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={(e) => onDownload(e, item.providerId, item.bucket, item.key, item.name)}
+            >
+              <IconDownload size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={handleCopy}
+            >
+              {copied ? (
+                <IconCheck size={16} className="text-green-500" />
+              ) : (
+                <IconCopy size={16} />
+              )}
+            </Button>
+          </div>
+        )}
+      </TableCell>
+    </TableRow>
   )
 }

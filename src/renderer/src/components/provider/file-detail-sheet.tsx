@@ -1,9 +1,11 @@
 import { format } from 'date-fns'
-import { IconDownload, IconCopy, IconLoader2 } from '@tabler/icons-react'
+import { IconDownload, IconCopy, IconCheck, IconLoader2 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import type { FileItem } from '@/lib/types'
 import { formatFileSize } from '@/lib/utils'
 import { getFileIcon } from '@/lib/file-utils'
+import { useDownloadFile } from '@/hooks/use-download-file'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import {
   Sheet,
   SheetContent,
@@ -32,7 +34,13 @@ export function FileDetailSheet({
   provider,
   bucket
 }: FileDetailSheetProps) {
-  // Signed URL for preview and download
+  // Download hook
+  const { downloadFile, isDownloading } = useDownloadFile({ provider, bucket })
+
+  // Copy URL hook
+  const { copied, copyToClipboard } = useCopyToClipboard()
+
+  // Signed URL for preview
   const { data: urlData, isLoading: urlLoading } = trpc.provider.getObjectUrl.useQuery(
     {
       provider,
@@ -60,14 +68,13 @@ export function FileDetailSheet({
   )
 
   const handleDownload = () => {
-    if (urlData?.url) {
-      window.open(urlData.url, '_blank')
-    }
+    if (!file) return
+    downloadFile({ key: file.id, fileName: file.name })
   }
 
   const handleCopyUrl = async () => {
     if (plainUrlData?.url) {
-      await navigator.clipboard.writeText(plainUrlData.url)
+      await copyToClipboard(plainUrlData.url)
     }
   }
 
@@ -148,10 +155,14 @@ export function FileDetailSheet({
                   variant="outline"
                   className="flex-1"
                   onClick={handleDownload}
-                  disabled={urlLoading || !urlData?.url}
+                  disabled={isDownloading}
                 >
-                  <IconDownload size={16} className="mr-2" />
-                  Download
+                  {isDownloading ? (
+                    <IconLoader2 size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <IconDownload size={16} className="mr-2" />
+                  )}
+                  {isDownloading ? 'Downloading...' : 'Download'}
                 </Button>
                 <Button
                   variant="outline"
@@ -159,8 +170,12 @@ export function FileDetailSheet({
                   onClick={handleCopyUrl}
                   disabled={!plainUrlData?.url}
                 >
-                  <IconCopy size={16} className="mr-2" />
-                  Copy URL
+                  {copied ? (
+                    <IconCheck size={16} className="mr-2 text-green-500" />
+                  ) : (
+                    <IconCopy size={16} className="mr-2" />
+                  )}
+                  {copied ? 'Copied!' : 'Copy URL'}
                 </Button>
               </div>
             )}

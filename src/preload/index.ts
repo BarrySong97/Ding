@@ -1,4 +1,4 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { exposeElectronTRPC } from 'trpc-electron/main'
 
@@ -14,7 +14,8 @@ const api = {
     isWindows: process.platform === 'win32',
     isLinux: process.platform === 'linux',
     name: process.platform
-  }
+  },
+  showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

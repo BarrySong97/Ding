@@ -11,6 +11,7 @@ declare global {
         isLinux: boolean
         name: NodeJS.Platform
       }
+      showInFolder: (filePath: string) => Promise<void>
     }
     electronTRPC: ElectronTRPC
   }

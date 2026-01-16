@@ -10,10 +10,12 @@ import {
   IconDatabase,
   IconClock,
   IconCheck,
-  IconX
+  IconX,
+  IconCopy
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { useDebouncedValue } from '@/hooks/use-debounce'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { FileDetailSheet } from '@/components/provider/file-detail-sheet'
 import type { FileItem } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
@@ -105,6 +107,10 @@ function MyUploadsPage() {
     }
   })
   const deleteObjectsMutation = trpc.provider.deleteObjects.useMutation()
+
+  // Download mutations
+  const showSaveDialogMutation = trpc.provider.showSaveDialog.useMutation()
+  const downloadToFileMutation = trpc.provider.downloadToFile.useMutation()
 
   const trpcUtils = trpc.useUtils()
 
@@ -276,20 +282,88 @@ function MyUploadsPage() {
     }
   }
 
-  const handleDownload = async (providerId: string, bucket: string, key: string) => {
+  const handleDownload = async (
+    providerId: string,
+    bucket: string,
+    key: string,
+    fileName: string
+  ) => {
     try {
       // Get provider first
       const provider = await trpcUtils.provider.getById.fetch({ id: providerId })
-      if (!provider) return
+      if (!provider) {
+        toast({
+          title: 'Download failed',
+          description: 'Provider not found',
+          variant: 'destructive'
+        })
+        return
+      }
 
-      const result = await trpcUtils.provider.getObjectUrl.fetch({
+      // Show save dialog
+      const dialogResult = await showSaveDialogMutation.mutateAsync({
+        defaultName: fileName
+      })
+
+      if (dialogResult.canceled || !dialogResult.filePath) {
+        return // User cancelled
+      }
+
+      // Download to file
+      const downloadResult = await downloadToFileMutation.mutateAsync({
+        provider,
+        bucket,
+        key,
+        savePath: dialogResult.filePath
+      })
+
+      if (downloadResult.success) {
+        toast({
+          title: 'Download complete',
+          description: `File saved to ${downloadResult.filePath}`
+        })
+      } else {
+        toast({
+          title: 'Download failed',
+          description: downloadResult.error || 'An unknown error occurred',
+          variant: 'destructive'
+        })
+      }
+    } catch (error) {
+      toast({
+        title: 'Download failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const getCopyUrl = async (providerId: string, bucket: string, key: string): Promise<string> => {
+    try {
+      const provider = await trpcUtils.provider.getById.fetch({ id: providerId })
+      if (!provider) {
+        toast({
+          title: 'Error',
+          description: 'Provider not found',
+          variant: 'destructive'
+        })
+        return ''
+      }
+
+      const result = await trpcUtils.provider.getPlainObjectUrl.fetch({
         provider,
         bucket,
         key
       })
-      window.open(result.url, '_blank')
+
+      return result.url || ''
     } catch (error) {
-      console.error('Failed to download:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to get URL.',
+        variant: 'destructive'
+      })
+      return ''
     }
   }
 
@@ -473,105 +547,20 @@ function MyUploadsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.data.map((item) => {
-                    const fileIcon = getFileIcon(
-                      {
-                        name: item.name,
-                        type: item.type as 'file' | 'folder',
-                        id: item.id,
-                        modified: new Date(),
-                        size: item.size || 0
-                      },
-                      'small'
-                    )
-
-                    return (
-                      <TableRow
-                        key={item.id}
-                        className="group cursor-pointer"
-                        onClick={() => handleRowClick(item)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={!!selectedItems[item.id]}
-                            onCheckedChange={(value) =>
-                              handleToggleSelection(
-                                {
-                                  id: item.id,
-                                  providerId: item.providerId,
-                                  bucket: item.bucket,
-                                  key: item.key,
-                                  type: item.type,
-                                  name: item.name
-                                },
-                                value === true
-                              )
-                            }
-                            aria-label={`Select ${item.name}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0">{fileIcon}</div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{item.name}</span>
-                              {item.isCompressed && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Compressed
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{item.bucket}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {item.size ? formatFileSize(item.size) : '-'}
-                        </TableCell>
-                        <TableCell>{renderStatusBadge(item.status, item.errorMessage)}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                            {item.type === 'file' && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                onClick={() =>
-                                  handleDownload(item.providerId, item.bucket, item.key)
-                                }
-                              >
-                                <IconDownload size={16} />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                'h-7 w-7 text-muted-foreground',
-                                'hover:bg-red-50 hover:text-red-500',
-                                'dark:hover:bg-red-900/20'
-                              )}
-                              onClick={() =>
-                                setDeleteTarget({
-                                  id: item.id,
-                                  providerId: item.providerId,
-                                  bucket: item.bucket,
-                                  key: item.key,
-                                  type: item.type,
-                                  name: item.name
-                                })
-                              }
-                              disabled={deleteObjectMutation.isPending}
-                            >
-                              <IconTrash size={16} />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+                  {data.data.map((item) => (
+                    <UploadHistoryRow
+                      key={item.id}
+                      item={item}
+                      isSelected={!!selectedItems[item.id]}
+                      onRowClick={handleRowClick}
+                      onToggleSelection={handleToggleSelection}
+                      onDownload={handleDownload}
+                      onCopyUrl={getCopyUrl}
+                      onDelete={setDeleteTarget}
+                      isDeleting={deleteObjectMutation.isPending}
+                      renderStatusBadge={renderStatusBadge}
+                    />
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -687,5 +676,175 @@ function MyUploadsPage() {
         bucket={selectedFileDetail?.bucket ?? ''}
       />
     </PageLayout>
+  )
+}
+
+// Upload history row component with copy hook
+interface UploadHistoryRowProps {
+  item: {
+    id: string
+    providerId: string
+    bucket: string
+    key: string
+    name: string
+    type: 'file' | 'folder'
+    size?: number | null
+    mimeType?: string | null
+    uploadedAt: string
+    isCompressed?: boolean | null
+    status: string
+    errorMessage?: string | null
+  }
+  isSelected: boolean
+  onRowClick: (item: UploadHistoryRowProps['item']) => void
+  onToggleSelection: (
+    item: {
+      id: string
+      providerId: string
+      bucket: string
+      key: string
+      type: 'file' | 'folder'
+      name: string
+    },
+    checked: boolean
+  ) => void
+  onDownload: (providerId: string, bucket: string, key: string, fileName: string) => void
+  onCopyUrl: (providerId: string, bucket: string, key: string) => Promise<string>
+  onDelete: (target: {
+    id: string
+    providerId: string
+    bucket: string
+    key: string
+    type: 'file' | 'folder'
+    name: string
+  }) => void
+  isDeleting: boolean
+  renderStatusBadge: (status: string, errorMessage?: string | null) => React.ReactNode
+}
+
+function UploadHistoryRow({
+  item,
+  isSelected,
+  onRowClick,
+  onToggleSelection,
+  onDownload,
+  onCopyUrl,
+  onDelete,
+  isDeleting,
+  renderStatusBadge
+}: UploadHistoryRowProps) {
+  const { copied, copyToClipboard } = useCopyToClipboard()
+
+  const handleCopy = async () => {
+    const url = await onCopyUrl(item.providerId, item.bucket, item.key)
+    if (url) {
+      await copyToClipboard(url)
+    }
+  }
+
+  const fileIcon = getFileIcon(
+    {
+      name: item.name,
+      type: item.type as 'file' | 'folder',
+      id: item.id,
+      modified: new Date(),
+      size: item.size || 0
+    },
+    'small'
+  )
+
+  return (
+    <TableRow className="group cursor-pointer" onClick={() => onRowClick(item)}>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={(value) =>
+            onToggleSelection(
+              {
+                id: item.id,
+                providerId: item.providerId,
+                bucket: item.bucket,
+                key: item.key,
+                type: item.type,
+                name: item.name
+              },
+              value === true
+            )
+          }
+          aria-label={`Select ${item.name}`}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0">{fileIcon}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{item.name}</span>
+            {item.isCompressed && (
+              <Badge variant="secondary" className="text-xs">
+                Compressed
+              </Badge>
+            )}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="text-muted-foreground">{item.bucket}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {item.size ? formatFileSize(item.size) : '-'}
+      </TableCell>
+      <TableCell>{renderStatusBadge(item.status, item.errorMessage)}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
+      </TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+          {item.type === 'file' && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={() => onDownload(item.providerId, item.bucket, item.key, item.name)}
+              >
+                <IconDownload size={16} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={handleCopy}
+              >
+                {copied ? (
+                  <IconCheck size={16} className="text-green-500" />
+                ) : (
+                  <IconCopy size={16} />
+                )}
+              </Button>
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-7 w-7 text-muted-foreground',
+              'hover:bg-red-50 hover:text-red-500',
+              'dark:hover:bg-red-900/20'
+            )}
+            onClick={() =>
+              onDelete({
+                id: item.id,
+                providerId: item.providerId,
+                bucket: item.bucket,
+                key: item.key,
+                type: item.type,
+                name: item.name
+              })
+            }
+            disabled={isDeleting}
+          >
+            <IconTrash size={16} />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   )
 }

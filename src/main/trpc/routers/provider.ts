@@ -18,7 +18,8 @@ import {
   listBucketsInputSchema,
   showSaveDialogInputSchema,
   downloadToFileInputSchema,
-  getPlainObjectUrlInputSchema
+  getPlainObjectUrlInputSchema,
+  showInFolderInputSchema
 } from '@shared/schema/trpc/provider'
 import {
   testConnection,
@@ -38,7 +39,7 @@ import {
   downloadToFile,
   getPlainObjectUrl
 } from '@main/services/provider-service'
-import { dialog, BrowserWindow } from 'electron'
+import { dialog, BrowserWindow, shell } from 'electron'
 import { providerRepository } from '@main/db/provider-repository'
 
 export const providerRouter = router({
@@ -183,5 +184,10 @@ export const providerRouter = router({
 
   getPlainObjectUrl: publicProcedure.input(getPlainObjectUrlInputSchema).query(({ input }) => {
     return getPlainObjectUrl(input)
+  }),
+
+  showInFolder: publicProcedure.input(showInFolderInputSchema).mutation(({ input }) => {
+    shell.showItemInFolder(input.filePath)
+    return { success: true }
   })
 })

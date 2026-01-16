@@ -101,6 +101,10 @@ export const getPlainObjectUrlInputSchema = z.object({
   key: z.string()
 })
 
+export const showInFolderInputSchema = z.object({
+  filePath: z.string()
+})
+
 // ============ Type Exports ============
 export type CreateProviderInput = z.infer<typeof createProviderInputSchema>
 export type DeleteProviderInput = z.infer<typeof deleteProviderInputSchema>
@@ -120,3 +124,4 @@ export type ListBucketsInput = z.infer<typeof listBucketsInputSchema>
 export type ShowSaveDialogInput = z.infer<typeof showSaveDialogInputSchema>
 export type DownloadToFileInput = z.infer<typeof downloadToFileInputSchema>
 export type GetPlainObjectUrlInput = z.infer<typeof getPlainObjectUrlInputSchema>
+export type ShowInFolderInput = z.infer<typeof showInFolderInputSchema>

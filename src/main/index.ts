@@ -75,6 +75,11 @@ app.whenReady().then(async () => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  // Show item in folder
+  ipcMain.handle('show-in-folder', (_event, filePath: string) => {
+    shell.showItemInFolder(filePath)
+  })
+
   const mainWindow = createWindow()
 
   // Setup tRPC IPC handler

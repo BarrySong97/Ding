@@ -43,6 +43,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { FileItem } from '@/lib/types'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
+import { useDownloadFile } from '@/hooks/use-download-file'
 
 interface BucketBrowserProps {
   provider: TRPCProvider
@@ -77,6 +78,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   const trpcUtils = trpc.useUtils()
   const moveObjectsMutation = trpc.provider.moveObjects.useMutation()
   const deleteObjectsMutation = trpc.provider.deleteObjects.useMutation()
+  const { downloadFile } = useDownloadFile({ provider, bucket })
 
   // Build prefix from path segments
   const prefix = useMemo(() => {
@@ -143,29 +145,21 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     // Double click on file does nothing extra (already opened on single click)
   }
 
-  const handleDownload = async (file: FileItem) => {
-    try {
-      const result = await trpcUtils.provider.getObjectUrl.fetch({
-        provider,
-        bucket,
-        key: file.id
-      })
-      window.open(result.url, '_blank')
-    } catch (err) {
-      console.error('Failed to get download URL:', err)
-    }
+  const handleDownload = (file: FileItem) => {
+    downloadFile({ key: file.id, fileName: file.name })
   }
 
-  const handleCopyUrl = async (file: FileItem) => {
+  const handleCopyUrl = async (file: FileItem): Promise<string> => {
     try {
       const result = await trpcUtils.provider.getPlainObjectUrl.fetch({
         provider,
         bucket,
         key: file.id
       })
-      await navigator.clipboard.writeText(result.url)
+      return result.url
     } catch (err) {
-      console.error('Failed to copy URL:', err)
+      console.error('Failed to get URL:', err)
+      return ''
     }
   }
 
