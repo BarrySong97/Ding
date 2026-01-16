@@ -28,7 +28,8 @@
       "Bash(pnpm db:generate:*)",
       "mcp__ide__getDiagnostics",
       "Bash(pnpm tsc:*)",
-      "Bash(pnpm drizzle-kit generate)"
+      "Bash(pnpm drizzle-kit generate)",
+      "Bash(pnpm build:unpack:*)"
     ]
   }
 }

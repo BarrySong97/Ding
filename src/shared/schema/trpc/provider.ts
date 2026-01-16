@@ -80,6 +80,27 @@ export const deleteBucketInputSchema = z.object({
   bucketName: z.string().min(1)
 })
 
+export const listBucketsInputSchema = z.object({
+  provider: providerSchema
+})
+
+export const showSaveDialogInputSchema = z.object({
+  defaultName: z.string()
+})
+
+export const downloadToFileInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  key: z.string(),
+  savePath: z.string()
+})
+
+export const getPlainObjectUrlInputSchema = z.object({
+  provider: providerSchema,
+  bucket: z.string(),
+  key: z.string()
+})
+
 // ============ Type Exports ============
 export type CreateProviderInput = z.infer<typeof createProviderInputSchema>
 export type DeleteProviderInput = z.infer<typeof deleteProviderInputSchema>
@@ -95,3 +116,7 @@ export type MoveObjectInput = z.infer<typeof moveObjectInputSchema>
 export type MoveObjectsInput = z.infer<typeof moveObjectsInputSchema>
 export type CreateBucketInput = z.infer<typeof createBucketInputSchema>
 export type DeleteBucketInput = z.infer<typeof deleteBucketInputSchema>
+export type ListBucketsInput = z.infer<typeof listBucketsInputSchema>
+export type ShowSaveDialogInput = z.infer<typeof showSaveDialogInputSchema>
+export type DownloadToFileInput = z.infer<typeof downloadToFileInputSchema>
+export type GetPlainObjectUrlInput = z.infer<typeof getPlainObjectUrlInputSchema>

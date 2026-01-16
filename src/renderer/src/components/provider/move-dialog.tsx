@@ -1,5 +1,12 @@
-import { useState, useEffect } from 'react'
-import { IconFolderSymlink, IconLoader2, IconFolder, IconChevronRight } from '@tabler/icons-react'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  IconFolderSymlink,
+  IconLoader2,
+  IconFolder,
+  IconChevronRight,
+  IconChevronDown,
+  IconBucket
+} from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import {
   Dialog,
@@ -14,14 +21,16 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import type { FileItem } from '@/lib/types'
 
-// Server-side file item type (modified is string)
-interface ServerFileItem {
+interface TreeNode {
   id: string
   name: string
-  type: 'file' | 'folder'
-  size?: number
-  modified?: string
-  mimeType?: string
+  type: 'bucket' | 'folder'
+  path: string
+  bucket: string
+  isLoaded: boolean
+  isExpanded: boolean
+  isLoading: boolean
+  children: TreeNode[]
 }
 
 interface MoveDialogProps {
@@ -34,6 +43,76 @@ interface MoveDialogProps {
   onSuccess?: () => void
 }
 
+function TreeNodeItem({
+  node,
+  level,
+  onExpand,
+  onSelect,
+  selectedNode
+}: {
+  node: TreeNode
+  level: number
+  onExpand: (node: TreeNode) => void
+  onSelect: (node: TreeNode) => void
+  selectedNode: TreeNode | null
+}) {
+  const isSelected = selectedNode?.id === node.id
+  const hasChildren = node.type === 'bucket' || node.children.length > 0 || !node.isLoaded
+
+  return (
+    <div>
+      <div
+        className={cn(
+          'flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted cursor-pointer',
+          isSelected && 'bg-primary/10 text-primary'
+        )}
+        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        onClick={() => onSelect(node)}
+      >
+        {hasChildren ? (
+          <button
+            className="flex h-5 w-5 items-center justify-center rounded hover:bg-muted-foreground/10"
+            onClick={(e) => {
+              e.stopPropagation()
+              onExpand(node)
+            }}
+          >
+            {node.isLoading ? (
+              <IconLoader2 size={14} className="animate-spin text-muted-foreground" />
+            ) : node.isExpanded ? (
+              <IconChevronDown size={14} className="text-muted-foreground" />
+            ) : (
+              <IconChevronRight size={14} className="text-muted-foreground" />
+            )}
+          </button>
+        ) : (
+          <div className="w-5" />
+        )}
+        {node.type === 'bucket' ? (
+          <IconBucket size={16} className="text-blue-500" />
+        ) : (
+          <IconFolder size={16} className="text-amber-500" />
+        )}
+        <span className="ml-1 truncate">{node.name}</span>
+      </div>
+      {node.isExpanded && node.children.length > 0 && (
+        <div>
+          {node.children.map((child) => (
+            <TreeNodeItem
+              key={child.id}
+              node={child}
+              level={level + 1}
+              onExpand={onExpand}
+              onSelect={onSelect}
+              selectedNode={selectedNode}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function MoveDialog({
   open,
   onOpenChange,
@@ -42,42 +121,152 @@ export function MoveDialog({
   file,
   onSuccess
 }: MoveDialogProps) {
-  const [selectedPath, setSelectedPath] = useState('')
-  const [browsePath, setBrowsePath] = useState('')
+  const [treeData, setTreeData] = useState<TreeNode[]>([])
+  const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const moveObjectMutation = trpc.provider.moveObject.useMutation()
+  const trpcUtils = trpc.useUtils()
 
-  // Fetch folders at current browse path
-  const { data: folderData, isLoading: isFoldersLoading } = trpc.provider.listObjects.useQuery(
-    {
-      provider,
-      bucket,
-      prefix: browsePath,
-      maxKeys: 100
-    },
-    {
-      enabled: open
-    }
+  // Fetch buckets on dialog open
+  const { data: buckets, isLoading: isBucketsLoading } = trpc.provider.listBuckets.useQuery(
+    { provider },
+    { enabled: open }
   )
 
-  // Reset state when dialog opens
+  // Initialize tree with buckets
   useEffect(() => {
-    if (open) {
-      setSelectedPath('')
-      setBrowsePath('')
+    if (buckets && open) {
+      setTreeData(
+        buckets.map((b) => ({
+          id: `bucket:${b.name}`,
+          name: b.name,
+          type: 'bucket' as const,
+          path: '',
+          bucket: b.name,
+          isLoaded: false,
+          isExpanded: false,
+          isLoading: false,
+          children: []
+        }))
+      )
+      setSelectedNode(null)
+      setError(null)
+    }
+  }, [buckets, open])
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setTreeData([])
+      setSelectedNode(null)
       setError(null)
     }
   }, [open])
 
-  const folders = folderData?.files.filter((f) => f.type === 'folder') || []
+  const updateNodeInTree = useCallback(
+    (
+      nodes: TreeNode[],
+      nodeId: string,
+      updater: (node: TreeNode) => TreeNode
+    ): TreeNode[] => {
+      return nodes.map((node) => {
+        if (node.id === nodeId) {
+          return updater(node)
+        }
+        if (node.children.length > 0) {
+          return {
+            ...node,
+            children: updateNodeInTree(node.children, nodeId, updater)
+          }
+        }
+        return node
+      })
+    },
+    []
+  )
+
+  const handleExpand = useCallback(
+    async (node: TreeNode) => {
+      // If already loaded, just toggle expand
+      if (node.isLoaded) {
+        setTreeData((prev) =>
+          updateNodeInTree(prev, node.id, (n) => ({
+            ...n,
+            isExpanded: !n.isExpanded
+          }))
+        )
+        return
+      }
+
+      // Set loading state
+      setTreeData((prev) =>
+        updateNodeInTree(prev, node.id, (n) => ({
+          ...n,
+          isLoading: true
+        }))
+      )
+
+      try {
+        // Fetch folders from the bucket/path
+        const result = await trpcUtils.provider.listObjects.fetch({
+          provider,
+          bucket: node.bucket,
+          prefix: node.path ? `${node.path}/` : undefined,
+          maxKeys: 1000
+        })
+
+        const folders = result.files
+          .filter((f) => f.type === 'folder')
+          .map((f) => ({
+            id: `folder:${node.bucket}:${f.id}`,
+            name: f.name,
+            type: 'folder' as const,
+            path: f.id.replace(/\/$/, ''),
+            bucket: node.bucket,
+            isLoaded: false,
+            isExpanded: false,
+            isLoading: false,
+            children: []
+          }))
+
+        setTreeData((prev) =>
+          updateNodeInTree(prev, node.id, (n) => ({
+            ...n,
+            isLoaded: true,
+            isExpanded: true,
+            isLoading: false,
+            children: folders
+          }))
+        )
+      } catch (err) {
+        console.error('Failed to load folders:', err)
+        setTreeData((prev) =>
+          updateNodeInTree(prev, node.id, (n) => ({
+            ...n,
+            isLoading: false
+          }))
+        )
+      }
+    },
+    [provider, trpcUtils, updateNodeInTree]
+  )
+
+  const handleSelect = useCallback((node: TreeNode) => {
+    setSelectedNode(node)
+    setError(null)
+  }, [])
 
   const handleMove = async () => {
-    if (!file) return
+    if (!file || !selectedNode) return
+
+    // Determine destination bucket and prefix
+    const destBucket = selectedNode.bucket
+    const destPrefix = selectedNode.type === 'bucket' ? '' : selectedNode.path + '/'
 
     // Don't allow moving to the same location
     const currentFolder = file.id.substring(0, file.id.lastIndexOf('/') + 1)
-    if (selectedPath === currentFolder) {
+    if (destBucket === bucket && destPrefix === currentFolder) {
       setError('File is already in this location')
       return
     }
@@ -85,11 +274,18 @@ export function MoveDialog({
     setError(null)
 
     try {
+      // If moving to a different bucket, we need to handle cross-bucket move
+      // For now, only support same-bucket moves
+      if (destBucket !== bucket) {
+        setError('Cross-bucket moves are not supported yet')
+        return
+      }
+
       const result = await moveObjectMutation.mutateAsync({
         provider,
         bucket,
         sourceKey: file.id,
-        destinationPrefix: selectedPath
+        destinationPrefix: destPrefix
       })
 
       if (result.success) {
@@ -105,25 +301,9 @@ export function MoveDialog({
 
   const handleClose = () => {
     if (!moveObjectMutation.isPending) {
-      setSelectedPath('')
-      setBrowsePath('')
-      setError(null)
       onOpenChange(false)
     }
   }
-
-  const handleFolderClick = (folder: ServerFileItem) => {
-    setBrowsePath(folder.id)
-  }
-
-  const handleSelectFolder = (path: string) => {
-    setSelectedPath(path)
-  }
-
-  const breadcrumbParts = browsePath
-    .replace(/\/$/, '')
-    .split('/')
-    .filter(Boolean)
 
   if (!file) return null
 
@@ -133,102 +313,46 @@ export function MoveDialog({
         <DialogHeader>
           <DialogTitle>Move {file.type === 'folder' ? 'Folder' : 'File'}</DialogTitle>
           <DialogDescription>
-            Select a destination folder for <span className="font-medium">{file.name}</span>
+            Select a destination for <span className="font-medium">{file.name}</span>
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Breadcrumb navigation */}
-          <div className="flex items-center gap-1 text-sm">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn('h-7 px-2', !browsePath && 'bg-muted')}
-              onClick={() => {
-                setBrowsePath('')
-                setSelectedPath('')
-              }}
-            >
-              Root
-            </Button>
-            {breadcrumbParts.map((part, index) => {
-              const path = breadcrumbParts.slice(0, index + 1).join('/') + '/'
-              return (
-                <div key={path} className="flex items-center">
-                  <IconChevronRight size={14} className="text-muted-foreground" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn('h-7 px-2', browsePath === path && 'bg-muted')}
-                    onClick={() => setBrowsePath(path)}
-                  >
-                    {part}
-                  </Button>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Folder list */}
-          <ScrollArea className="h-64 rounded-md border">
+          {/* Tree view */}
+          <ScrollArea className="h-72 rounded-md border">
             <div className="p-2">
-              {/* Option to select current browsed folder */}
-              <button
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted',
-                  selectedPath === browsePath && 'bg-primary/10 text-primary'
-                )}
-                onClick={() => handleSelectFolder(browsePath)}
-              >
-                <IconFolder size={18} className="text-muted-foreground" />
-                <span className="font-medium">
-                  {browsePath ? `Current folder (${browsePath.replace(/\/$/, '').split('/').pop()})` : 'Root folder'}
-                </span>
-              </button>
-
-              {isFoldersLoading ? (
+              {isBucketsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <IconLoader2 size={24} className="animate-spin text-muted-foreground" />
                 </div>
-              ) : folders.length === 0 ? (
+              ) : treeData.length === 0 ? (
                 <div className="py-8 text-center text-sm text-muted-foreground">
-                  No subfolders in this location
+                  No buckets available
                 </div>
               ) : (
-                folders.map((folder) => (
-                  <div
-                    key={folder.id}
-                    className={cn(
-                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted',
-                      selectedPath === folder.id && 'bg-primary/10 text-primary'
-                    )}
-                  >
-                    <button
-                      className="flex flex-1 items-center gap-2"
-                      onClick={() => handleSelectFolder(folder.id)}
-                    >
-                      <IconFolder size={18} className="text-muted-foreground" />
-                      <span>{folder.name}</span>
-                    </button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2"
-                      onClick={() => handleFolderClick(folder)}
-                    >
-                      <IconChevronRight size={14} />
-                    </Button>
-                  </div>
+                treeData.map((node) => (
+                  <TreeNodeItem
+                    key={node.id}
+                    node={node}
+                    level={0}
+                    onExpand={handleExpand}
+                    onSelect={handleSelect}
+                    selectedNode={selectedNode}
+                  />
                 ))
               )}
             </div>
           </ScrollArea>
 
           {/* Selected destination */}
-          {selectedPath !== undefined && (
+          {selectedNode && (
             <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
               <span className="text-muted-foreground">Move to: </span>
-              <span className="font-medium">{selectedPath || '/ (root)'}</span>
+              <span className="font-medium">
+                {selectedNode.type === 'bucket'
+                  ? `${selectedNode.name} (root)`
+                  : `${selectedNode.bucket}/${selectedNode.path}`}
+              </span>
             </div>
           )}
 
@@ -239,7 +363,10 @@ export function MoveDialog({
           <Button variant="outline" onClick={handleClose} disabled={moveObjectMutation.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleMove} disabled={moveObjectMutation.isPending}>
+          <Button
+            onClick={handleMove}
+            disabled={moveObjectMutation.isPending || !selectedNode}
+          >
             {moveObjectMutation.isPending ? (
               <>
                 <IconLoader2 size={16} className="mr-2 animate-spin" />

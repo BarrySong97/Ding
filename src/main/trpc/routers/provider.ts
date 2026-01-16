@@ -14,7 +14,11 @@ import {
   moveObjectInputSchema,
   moveObjectsInputSchema,
   createBucketInputSchema,
-  deleteBucketInputSchema
+  deleteBucketInputSchema,
+  listBucketsInputSchema,
+  showSaveDialogInputSchema,
+  downloadToFileInputSchema,
+  getPlainObjectUrlInputSchema
 } from '@shared/schema/trpc/provider'
 import {
   testConnection,
@@ -29,8 +33,12 @@ import {
   moveObject,
   moveObjects,
   createBucket,
-  deleteBucket
+  deleteBucket,
+  listBuckets,
+  downloadToFile,
+  getPlainObjectUrl
 } from '@main/services/provider-service'
+import { dialog, BrowserWindow } from 'electron'
 import { providerRepository } from '@main/db/provider-repository'
 
 export const providerRouter = router({
@@ -154,5 +162,26 @@ export const providerRouter = router({
     const result = await deleteBucket(input)
     await providerRepository.updateLastOperationAt(input.provider.id)
     return result
+  }),
+
+  listBuckets: publicProcedure.input(listBucketsInputSchema).query(async ({ input }) => {
+    return listBuckets(input)
+  }),
+
+  showSaveDialog: publicProcedure.input(showSaveDialogInputSchema).mutation(async ({ input }) => {
+    const window = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showSaveDialog(window!, {
+      defaultPath: input.defaultName,
+      filters: [{ name: 'All Files', extensions: ['*'] }]
+    })
+    return { canceled: result.canceled, filePath: result.filePath || '' }
+  }),
+
+  downloadToFile: publicProcedure.input(downloadToFileInputSchema).mutation(async ({ input }) => {
+    return downloadToFile(input)
+  }),
+
+  getPlainObjectUrl: publicProcedure.input(getPlainObjectUrlInputSchema).query(({ input }) => {
+    return getPlainObjectUrl(input)
   })
 })

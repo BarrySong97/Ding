@@ -227,10 +227,6 @@ export function FileList({
                         )}
                         <DropdownMenuItem onClick={() => onRename?.(file)}>Rename</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onMove?.(file)}>Move to...</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => onDelete?.(file)} variant="destructive">
-                          Delete
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

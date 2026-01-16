@@ -12,7 +12,10 @@ import {
   IconCheck,
   IconX
 } from '@tabler/icons-react'
-import { trpc } from '@renderer/lib/trpc'
+import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
+import { useDebouncedValue } from '@/hooks/use-debounce'
+import { FileDetailSheet } from '@/components/provider/file-detail-sheet'
+import type { FileItem } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,8 +52,16 @@ export const Route = createFileRoute('/my-uploads')({
 })
 
 function MyUploadsPage() {
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const debouncedSearch = useDebouncedValue(searchInput, 300)
   const [page, setPage] = useState(1)
+  // File detail drawer state
+  const [fileDetailOpen, setFileDetailOpen] = useState(false)
+  const [selectedFileDetail, setSelectedFileDetail] = useState<{
+    file: FileItem
+    provider: TRPCProvider
+    bucket: string
+  } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string
     providerId: string
@@ -77,7 +88,7 @@ function MyUploadsPage() {
 
   // Fetch upload history
   const { data, isLoading, isFetching, refetch } = trpc.uploadHistory.list.useQuery({
-    query: searchQuery || undefined,
+    query: debouncedSearch || undefined,
     page,
     pageSize,
     sortBy: 'uploadedAt',
@@ -282,6 +293,44 @@ function MyUploadsPage() {
     }
   }
 
+  const handleRowClick = async (item: {
+    id: string
+    providerId: string
+    bucket: string
+    key: string
+    name: string
+    type: 'file' | 'folder'
+    size?: number | null
+    mimeType?: string | null
+    uploadedAt: string
+  }) => {
+    try {
+      const provider = await trpcUtils.provider.getById.fetch({ id: item.providerId })
+      if (!provider) {
+        toast({
+          title: 'Error',
+          description: 'Provider not found for this file.',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const file: FileItem = {
+        id: item.key,
+        name: item.name,
+        type: item.type,
+        size: item.size ?? undefined,
+        modified: new Date(item.uploadedAt),
+        mimeType: item.mimeType ?? undefined
+      }
+
+      setSelectedFileDetail({ file, provider, bucket: item.bucket })
+      setFileDetailOpen(true)
+    } catch (error) {
+      console.error('Failed to open file details:', error)
+    }
+  }
+
   const renderStatusBadge = (status: string, errorMessage?: string | null) => {
     switch (status) {
       case 'completed':
@@ -369,9 +418,9 @@ function MyUploadsPage() {
               />
               <Input
                 placeholder="Search by filename..."
-                value={searchQuery}
+                value={searchInput}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value)
+                  setSearchInput(e.target.value)
                   setPage(1)
                 }}
                 className="pl-9"
@@ -437,8 +486,12 @@ function MyUploadsPage() {
                     )
 
                     return (
-                      <TableRow key={item.id} className="group">
-                        <TableCell>
+                      <TableRow
+                        key={item.id}
+                        className="group cursor-pointer"
+                        onClick={() => handleRowClick(item)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={!!selectedItems[item.id]}
                             onCheckedChange={(value) =>
@@ -478,7 +531,7 @@ function MyUploadsPage() {
                         <TableCell className="text-muted-foreground">
                           {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                             {item.type === 'file' && (
                               <Button
@@ -625,6 +678,14 @@ function MyUploadsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* File Detail Sheet */}
+      <FileDetailSheet
+        open={fileDetailOpen}
+        onOpenChange={setFileDetailOpen}
+        file={selectedFileDetail?.file ?? null}
+        provider={selectedFileDetail?.provider ?? ({} as TRPCProvider)}
+        bucket={selectedFileDetail?.bucket ?? ''}
+      />
     </PageLayout>
   )
 }

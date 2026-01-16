@@ -66,7 +66,8 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
   const [actionFile, setActionFile] = useState<FileItem | null>(null)
   // State for selection, search, and drag-drop
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
   const [batchMoveDialogOpen, setBatchMoveDialogOpen] = useState(false)
   // Upload drop zone state
@@ -112,12 +113,12 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     }))
   }, [data?.files])
 
-  // Filter files by search query
+  // Filter files by applied search query (triggered on Enter)
   const filteredFiles = useMemo(() => {
-    if (!searchQuery.trim()) return files
-    const query = searchQuery.toLowerCase()
+    if (!appliedSearch.trim()) return files
+    const query = appliedSearch.toLowerCase()
     return files.filter((file) => file.name.toLowerCase().includes(query))
-  }, [files, searchQuery])
+  }, [files, appliedSearch])
 
   const handleFileClick = (file: FileItem) => {
     if (file.type === 'folder') {
@@ -157,7 +158,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
 
   const handleCopyUrl = async (file: FileItem) => {
     try {
-      const result = await trpcUtils.provider.getObjectUrl.fetch({
+      const result = await trpcUtils.provider.getPlainObjectUrl.fetch({
         provider,
         bucket,
         key: file.id
@@ -330,9 +331,20 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
             className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search files... (press Enter)"
+            value={searchInput}
+            onChange={(e) => {
+              setSearchInput(e.target.value)
+              // Clear applied search if input is cleared
+              if (!e.target.value) {
+                setAppliedSearch('')
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setAppliedSearch(searchInput)
+              }
+            }}
             className="h-8 pl-8 text-sm"
           />
         </div>
@@ -381,7 +393,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <IconFolder size={48} className="mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">
-              {searchQuery ? 'No files match your search' : 'This folder is empty'}
+              {appliedSearch ? 'No files match your search' : 'This folder is empty'}
             </p>
           </div>
         ) : (

@@ -16,18 +16,18 @@ interface FileGridProps {
   files: FileItem[]
   onFileClick: (file: FileItem) => void
   onDownload?: (file: FileItem) => void
-  onDelete?: (file: FileItem) => void
   onCopyUrl?: (file: FileItem) => void
   onRename?: (file: FileItem) => void
+  onMove?: (file: FileItem) => void
 }
 
 export function FileGrid({
   files,
   onFileClick,
   onDownload,
-  onDelete,
   onCopyUrl,
-  onRename
+  onRename,
+  onMove
 }: FileGridProps) {
   if (files.length === 0) {
     return (
@@ -83,13 +83,7 @@ export function FileGrid({
                   </>
                 )}
                 <DropdownMenuItem onClick={() => onRename?.(file)}>Rename</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => onDelete?.(file)}
-                  variant="destructive"
-                >
-                  Delete
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMove?.(file)}>Move to...</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
