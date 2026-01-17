@@ -11,7 +11,8 @@ export type Database = ReturnType<typeof drizzle<typeof schema>>
 let db: Database | null = null
 
 export function getDatabasePath(): string {
-  const appEnv = process.env.APP_ENV ?? 'dev'
+  const appName = app.getName().toLowerCase()
+  const appEnv = is.dev ? 'dev' : appName.includes('test') ? 'test' : 'prod'
   const dbName = `pglite-db-${appEnv}`
   return path.join(app.getPath('userData'), dbName)
 }

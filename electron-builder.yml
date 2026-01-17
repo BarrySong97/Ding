@@ -1,4 +1,4 @@
-appId: com.electron.app
+appId: com.ding.app
 productName: ding
 directories:
   buildResources: build
