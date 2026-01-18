@@ -104,7 +104,7 @@ export function AppSidebar() {
   const { setProvider } = useNavigationStore()
 
   const isProviderActive = (providerId: string) => {
-    return currentPath.includes(`/provider/${providerId}`)
+    return currentPath.includes(`/providers/${providerId}`)
   }
 
   const isDashboardActive = currentPath === '/'
@@ -272,10 +272,15 @@ export function AppSidebar() {
                         {providerBuckets.length > 0 && isOpen && (
                           <SidebarMenuSub className="bg-white/70 dark:bg-[#2a2a2a] rounded-md py-1">
                             {providerBuckets.map((bucket) => {
+                              const isActive = currentPath.includes(`/providers/${provider.id}/${bucket.bucketName}`)
                               return (
                                 <SidebarMenuSubItem
                                   key={`${bucket.providerId}-${bucket.bucketName}`}
-                                  className="relative"
+
+                                  className={cn(
+                                    'relative',
+                                    isActive && 'bg-accent rounded-md'
+                                  )}
                                 >
                                   <SidebarMenuSubButton
                                     asChild

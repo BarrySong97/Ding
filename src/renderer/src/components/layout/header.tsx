@@ -158,7 +158,7 @@ export function Header() {
     }
 
     // 5. Provider 详情页面
-    if (currentPath.startsWith('/provider/') && currentProvider) {
+    if (currentPath.startsWith('/providers/') && currentProvider) {
       const providersConfig = findRouteConfig('/providers')
       const ProviderIcon = getProviderIcon(currentProvider.variant)
       const isLastItem = !currentBucket
