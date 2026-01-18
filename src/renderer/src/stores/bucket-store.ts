@@ -9,10 +9,6 @@ export interface RecentBucket {
   lastAccessedAt: number
 }
 
-export interface BucketSettings {
-  autoOpenLastBucket: boolean
-}
-
 interface BucketStore {
   // Recent buckets list
   recentBuckets: RecentBucket[]
@@ -30,9 +26,6 @@ interface BucketStore {
     bucketName: string
   } | null
 
-  // Settings
-  settings: BucketSettings
-
   // Actions
   addRecentBucket: (bucket: Omit<RecentBucket, 'lastAccessedAt'>) => void
   setLastAccessed: (providerId: string, bucketName: string) => void
@@ -40,7 +33,6 @@ interface BucketStore {
   setPendingOpenBucket: (providerId: string, bucketName: string) => void
   clearPendingOpenBucket: () => void
   clearRecentBuckets: () => void
-  updateSettings: (settings: Partial<BucketSettings>) => void
   getRecentBucketsForProvider: (providerId: string) => RecentBucket[]
 }
 
@@ -54,9 +46,6 @@ export const useBucketStore = create<BucketStore>()(
       lastProviderId: null,
       lastBucketName: null,
       pendingOpenBucket: null,
-      settings: {
-        autoOpenLastBucket: false
-      },
 
       addRecentBucket: (bucket) => {
         set((state) => {
@@ -118,15 +107,6 @@ export const useBucketStore = create<BucketStore>()(
           lastBucketName: null,
           pendingOpenBucket: null
         })
-      },
-
-      updateSettings: (newSettings) => {
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            ...newSettings
-          }
-        }))
       },
 
       getRecentBucketsForProvider: (providerId) => {

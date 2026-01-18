@@ -1,4 +1,4 @@
-import { Link, useRouterState } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { IconCloud, IconBrandAws, IconFolder, IconFolderOpen } from '@tabler/icons-react'
 import {
   Breadcrumb,
@@ -41,7 +41,7 @@ export function Header() {
   const findRouteConfig = (path: string) => {
     return findMenuItemByPath(path)
   }
-
+  const navigate = useNavigate()
   // 生成面包屑项
   const renderBreadcrumbs = () => {
     const items: React.ReactNode[] = []
@@ -195,7 +195,12 @@ export function Header() {
           <BreadcrumbItem key="provider">
             <button
               onClick={() => {
-                useNavigationStore.getState().setBucket(null)
+                navigate({
+                  to: '/providers/$providerId',
+                  params: {
+                    providerId: currentProvider.id
+                  }
+                })
               }}
               className={linkStyle}
             >
