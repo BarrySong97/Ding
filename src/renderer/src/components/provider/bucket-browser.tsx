@@ -8,7 +8,8 @@ import {
   IconSearch,
   IconTrash,
   IconChevronRight,
-  IconDownload
+  IconDownload,
+  IconQuestionMark
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { FileList } from '@renderer/components/file-browser/file-list'
@@ -21,6 +22,7 @@ import { FileDetailSheet } from '@renderer/components/provider/file-detail-sheet
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { FileListSkeleton } from '@/components/ui/table-skeleton'
 import {
   AlertDialog,
@@ -94,11 +96,17 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     return result
   }, [path])
 
+  const listPrefix = useMemo(() => {
+    const trimmedSearch = appliedSearch.trim()
+    if (trimmedSearch) return trimmedSearch
+    return prefix
+  }, [appliedSearch, prefix])
+
   const { data, isLoading, isFetching, error, refetch } = trpc.provider.listObjects.useQuery(
     {
       provider,
       bucket,
-      prefix,
+      prefix: listPrefix,
       cursor,
       maxKeys: 30
     },
@@ -121,12 +129,12 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
     }))
   }, [data?.files])
 
-  // Filter files by applied search query (triggered on Enter)
-  const filteredFiles = useMemo(() => {
-    if (!appliedSearch.trim()) return files
-    const query = appliedSearch.toLowerCase()
-    return files.filter((file) => file.name.toLowerCase().includes(query))
-  }, [files, appliedSearch])
+  const handleApplySearch = (nextSearch: string) => {
+    setAppliedSearch(nextSearch)
+    setCursor(undefined)
+    setCursorHistory([])
+    setSelectedIds(new Set())
+  }
 
   const handleFileClick = (file: FileItem) => {
     if (file.type === 'folder') {
@@ -163,9 +171,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
 
   const handleBatchDownload = async () => {
     if (selectedIds.size === 0 || isBatchDownloading) return
-    const selectedFiles = filteredFiles.filter(
-      (file) => selectedIds.has(file.id) && file.type === 'file'
-    )
+    const selectedFiles = files.filter((file) => selectedIds.has(file.id) && file.type === 'file')
     if (selectedFiles.length === 0) {
       toast({
         title: 'Download unavailable',
@@ -427,19 +433,34 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
             placeholder="Search files... (press Enter)"
             value={searchInput}
             onChange={(e) => {
-              setSearchInput(e.target.value)
+              const nextValue = e.target.value
+              setSearchInput(nextValue)
               // Clear applied search if input is cleared
-              if (!e.target.value) {
-                setAppliedSearch('')
+              if (!nextValue) {
+                handleApplySearch('')
               }
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                setAppliedSearch(searchInput)
+                handleApplySearch(searchInput)
               }
             }}
             className="h-8 pl-8 text-sm"
           />
+          <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="pointer-events-auto inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:text-foreground">
+                  <IconQuestionMark size={12} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                S3 does not support filename search. Search works by key prefix. To find a file by
+                name, include its folder key in the prefix. Without a folder key, it matches only
+                items in the current path.
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </div>
 
@@ -482,7 +503,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
               </Button>
             </div>
           </div>
-        ) : filteredFiles.length === 0 ? (
+        ) : files.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <IconFolder size={48} className="mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">
@@ -492,7 +513,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
         ) : (
           <>
             <FileList
-              files={filteredFiles}
+              files={files}
               onFileClick={handleFileClick}
               onFileDoubleClick={handleFileDoubleClick}
               onDownload={handleDownload}
@@ -518,7 +539,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
       {/* Status bar with pagination */}
       {!error && (
         <div className="flex items-center justify-between border-t border-border px-6 py-3 text-sm text-muted-foreground">
-          <span>Showing {filteredFiles.length} items</span>
+          <span>Showing {files.length} items</span>
           {(hasPrevPage || hasNextPage) && (
             <div className="flex items-center gap-4">
               <button
@@ -563,7 +584,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
               disabled={
                 isBatchDownloading ||
                 selectedIds.size === 0 ||
-                filteredFiles.every((file) => !selectedIds.has(file.id) || file.type !== 'file')
+                files.every((file) => !selectedIds.has(file.id) || file.type !== 'file')
               }
               className="h-8"
             >

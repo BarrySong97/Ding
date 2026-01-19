@@ -11,6 +11,7 @@ export const listObjectsInputSchema = z.object({
   provider: providerSchema,
   bucket: z.string(),
   prefix: z.string().optional(),
+  search: z.string().optional(),
   cursor: z.string().optional(),
   maxKeys: z.number().optional()
 })

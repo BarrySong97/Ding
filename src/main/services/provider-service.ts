@@ -27,6 +27,7 @@ export interface ListObjectsInput {
   provider: Provider
   bucket: string
   prefix?: string
+  search?: string
   cursor?: string
   maxKeys?: number
 }
@@ -154,6 +155,7 @@ export async function listObjects(input: ListObjectsInput) {
   const adapter = createStorageAdapter(input.provider)
   return adapter.listObjects(input.bucket, {
     prefix: input.prefix,
+    search: input.search,
     cursor: input.cursor,
     maxKeys: input.maxKeys
   })
@@ -342,7 +344,9 @@ export function getPlainObjectUrl(input: GetPlainObjectUrlInput): PlainObjectUrl
       }
       // Default R2 endpoint (requires account ID)
       if (provider.accountId) {
-        return { url: `https://${provider.accountId}.r2.cloudflarestorage.com/${bucket}/${encodedKey}` }
+        return {
+          url: `https://${provider.accountId}.r2.cloudflarestorage.com/${bucket}/${encodedKey}`
+        }
       }
       return { url: `https://r2.cloudflarestorage.com/${bucket}/${encodedKey}` }
     }

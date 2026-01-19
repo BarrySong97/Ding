@@ -21,6 +21,7 @@ export interface FileItem {
 
 export interface ListObjectsOptions {
   prefix?: string
+  search?: string
   cursor?: string
   maxKeys?: number
 }
