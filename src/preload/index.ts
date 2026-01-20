@@ -15,11 +15,13 @@ const api = {
     isLinux: process.platform === 'linux',
     name: process.platform
   },
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath),
   getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
   // Auto-updater APIs
   updater: {
     checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    downloadUpdate: () => ipcRenderer.invoke('download-update'),
     installUpdate: () => ipcRenderer.invoke('install-update'),
     onUpdateChecking: (callback: () => void) => {
       ipcRenderer.on('update-checking', callback)

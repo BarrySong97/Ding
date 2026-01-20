@@ -37,12 +37,17 @@ export function GlobalAutoUpdateChecker() {
 
       // 显示更新可用通知
       toast.info(`New version ${info.version} available`, {
-        description: 'Click to download and install',
+        description: 'Click Download to install the update',
         duration: Infinity, // 不自动关闭
         action: {
           label: 'Download',
           onClick: () => {
-            // 下载会自动开始，这里只是关闭 toast
+            // 用户点击后开始下载
+            window.api.updater.downloadUpdate()
+            toast.loading('Starting download...', {
+              id: 'update-download-progress',
+              description: `Version ${info.version}`
+            })
           }
         },
         cancel: {

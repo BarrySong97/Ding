@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { IconRefresh } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
@@ -11,9 +11,18 @@ export const Route = createFileRoute('/settings/')({
 
 function SettingsIndex() {
   const [checking, setChecking] = useState(false)
+  const [version, setVersion] = useState('...')
 
   // 只在生产环境下显示更新功能
   const isProduction = import.meta.env.VITE_APP_ENV === 'prod'
+
+  // 获取应用版本号
+  useEffect(() => {
+    window.api
+      .getAppVersion()
+      .then(setVersion)
+      .catch(() => setVersion('Unknown'))
+  }, [])
 
   const handleCheckForUpdates = async () => {
     setChecking(true)
@@ -66,7 +75,7 @@ function SettingsIndex() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>Version:</span>
-              <span>1.0.0</span>
+              <span>{version}</span>
             </div>
           </div>
           {isProduction && (

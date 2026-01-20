@@ -27,10 +27,12 @@ declare global {
         isLinux: boolean
         name: NodeJS.Platform
       }
+      getAppVersion: () => Promise<string>
       showInFolder: (filePath: string) => Promise<void>
       getDatabasePath: () => Promise<string>
       updater: {
         checkForUpdates: () => Promise<{ success?: boolean; error?: string; updateInfo?: any }>
+        downloadUpdate: () => Promise<void>
         installUpdate: () => void
         onUpdateChecking: (callback: () => void) => () => void
         onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void

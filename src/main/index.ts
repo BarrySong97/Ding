@@ -10,6 +10,9 @@ import { appRouter } from './trpc/router'
 import { initDatabase, getDatabasePath } from './db'
 import { initializeBuiltInPresets } from './services/preset-service'
 
+// 导入 package.json 获取版本号
+import packageInfo from '../../package.json'
+
 function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -60,6 +63,9 @@ function createWindow(): BrowserWindow {
 function setupAutoUpdater(mainWindow: BrowserWindow): void {
   // 配置更新日志
   autoUpdater.logger = console
+
+  // 禁用自动下载
+  autoUpdater.autoDownload = false
 
   // 在开发环境下不检查更新
   if (is.dev || import.meta.env.VITE_APP_ENV !== 'prod') {
@@ -140,6 +146,11 @@ app.whenReady().then(async () => {
     return getDatabasePath()
   })
 
+  // Get app version
+  ipcMain.handle('get-app-version', () => {
+    return packageInfo.version
+  })
+
   const mainWindow = createWindow()
 
   // Setup tRPC IPC handler
@@ -156,10 +167,12 @@ app.whenReady().then(async () => {
 
     return new Promise((resolve) => {
       let resolved = false
+      let timeout: NodeJS.Timeout
 
       const onUpdateAvailable = (info: any) => {
         if (!resolved) {
           resolved = true
+          clearTimeout(timeout)
           cleanup()
           resolve({ success: true, updateInfo: info })
         }
@@ -168,6 +181,7 @@ app.whenReady().then(async () => {
       const onUpdateNotAvailable = (_info: any) => {
         if (!resolved) {
           resolved = true
+          clearTimeout(timeout)
           cleanup()
           resolve({ success: true, updateInfo: null })
         }
@@ -176,6 +190,7 @@ app.whenReady().then(async () => {
       const onError = (error: Error) => {
         if (!resolved) {
           resolved = true
+          clearTimeout(timeout)
           cleanup()
           resolve({ error: error.message })
         }
@@ -188,7 +203,7 @@ app.whenReady().then(async () => {
       }
 
       // 设置超时
-      const timeout = setTimeout(() => {
+      timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true
           cleanup()
@@ -216,6 +231,11 @@ app.whenReady().then(async () => {
   // IPC handler for installing update
   ipcMain.handle('install-update', () => {
     autoUpdater.quitAndInstall()
+  })
+
+  // IPC handler for downloading update
+  ipcMain.handle('download-update', () => {
+    autoUpdater.downloadUpdate()
   })
 
   app.on('activate', function () {
