@@ -2,6 +2,16 @@
 
 A cross-platform desktop application for managing and uploading files to multiple cloud storage providers.
 
+![Preview 3](./docs/images/preview3.png)
+
+## Features
+
+- Multi-Provider Support
+- File Management
+- Image Compression
+- Provider Management
+- User Interface
+
 ## Tech Stack
 
 - **Electron** - Cross-platform desktop application framework
@@ -26,6 +36,8 @@ A cross-platform desktop application for managing and uploading files to multipl
 - Supabase Storage
 - Custom S3-compatible storage providers
 
+![Preview 8](./docs/images/preview8.png)
+
 ### File Management
 
 - Upload files to cloud storage buckets
@@ -34,6 +46,10 @@ A cross-platform desktop application for managing and uploading files to multipl
 - Upload history tracking
 - Image preview with blurhash placeholders
 - Drag-and-drop file upload
+
+![Preview 1](./docs/images/preview1.png)
+![Preview 2](./docs/images/preview2.png)
+![Preview 7](./docs/images/preview7.png)
 
 ### Image Compression
 
@@ -48,20 +64,9 @@ A cross-platform desktop application for managing and uploading files to multipl
 - Batch compression support
 - Compression statistics (file size reduction percentage)
 
-### Provider Management
-
-- Add and configure multiple storage providers
-- Test connection before saving
-- Manage multiple buckets per provider
-- Recent providers quick access in sidebar
-
-### User Interface
-
-- Dark mode support
-- Responsive layout with collapsible sidebar
-- Recent buckets navigation
-- Active route indicators
-- Type-safe navigation
+![Preview 6](./docs/images/preview6.png)
+![Preview 4](./docs/images/preview4.png)
+![Preview 5](./docs/images/preview5.png)
 
 ## License
 

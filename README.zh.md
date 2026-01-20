@@ -2,6 +2,8 @@
 
 一个跨平台桌面应用程序，用于管理和上传文件到多个云存储服务商。
 
+![Preview 3](./docs/images/preview3.png)
+
 ## 技术栈
 
 - **Electron** - 跨平台桌面应用框架
@@ -26,6 +28,8 @@
 - Supabase Storage
 - 自定义 S3 兼容存储服务商
 
+![Preview 8](./docs/images/preview8.png)
+
 ### 文件管理
 
 - 上传文件到云存储桶
@@ -34,6 +38,10 @@
 - 上传历史记录跟踪
 - 图片预览（支持 blurhash 占位符）
 - 拖放上传文件
+
+![Preview 1](./docs/images/preview1.png)
+![Preview 2](./docs/images/preview2.png)
+![Preview 7](./docs/images/preview7.png)
 
 ### 图片压缩
 
@@ -48,20 +56,11 @@
 - 批量压缩支持
 - 压缩统计（文件大小减少百分比）
 
-### 服务商管理
+![Preview 6](./docs/images/preview6.png)
+![Preview 4](./docs/images/preview4.png)
+![Preview 5](./docs/images/preview5.png)
 
-- 添加和配置多个存储服务商
-- 保存前测试连接
-- 管理每个服务商的多个存储桶
-- 侧边栏快速访问最近使用的服务商
 
-### 用户界面
-
-- 深色模式支持
-- 响应式布局，可折叠侧边栏
-- 最近使用的存储桶导航
-- 活动路由指示器
-- 类型安全的导航
 
 ## 开源协议
 
