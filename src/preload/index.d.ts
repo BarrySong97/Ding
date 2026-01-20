@@ -1,6 +1,22 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { ElectronTRPC } from 'trpc-electron/main'
 
+interface UpdateInfo {
+  version: string
+  files: any[]
+  releaseDate: string
+  releaseNotes?: string
+  releaseName?: string
+}
+
+interface ProgressInfo {
+  total: number
+  delta: number
+  transferred: number
+  percent: number
+  bytesPerSecond: number
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI
@@ -13,6 +29,16 @@ declare global {
       }
       showInFolder: (filePath: string) => Promise<void>
       getDatabasePath: () => Promise<string>
+      updater: {
+        checkForUpdates: () => Promise<{ success?: boolean; error?: string; updateInfo?: any }>
+        installUpdate: () => void
+        onUpdateChecking: (callback: () => void) => () => void
+        onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void
+        onUpdateNotAvailable: (callback: (info: UpdateInfo) => void) => () => void
+        onDownloadProgress: (callback: (progress: ProgressInfo) => void) => () => void
+        onUpdateDownloaded: (callback: (info: UpdateInfo) => void) => () => void
+        onUpdateError: (callback: (error: Error) => void) => () => void
+      }
     }
     electronTRPC: ElectronTRPC
   }

@@ -16,7 +16,36 @@ const api = {
     name: process.platform
   },
   showInFolder: (filePath: string) => ipcRenderer.invoke('show-in-folder', filePath),
-  getDatabasePath: () => ipcRenderer.invoke('get-database-path')
+  getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
+  // Auto-updater APIs
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+    installUpdate: () => ipcRenderer.invoke('install-update'),
+    onUpdateChecking: (callback: () => void) => {
+      ipcRenderer.on('update-checking', callback)
+      return () => ipcRenderer.removeListener('update-checking', callback)
+    },
+    onUpdateAvailable: (callback: (info: any) => void) => {
+      ipcRenderer.on('update-available', (_event, info) => callback(info))
+      return () => ipcRenderer.removeListener('update-available', callback)
+    },
+    onUpdateNotAvailable: (callback: (info: any) => void) => {
+      ipcRenderer.on('update-not-available', (_event, info) => callback(info))
+      return () => ipcRenderer.removeListener('update-not-available', callback)
+    },
+    onDownloadProgress: (callback: (progress: any) => void) => {
+      ipcRenderer.on('update-download-progress', (_event, progress) => callback(progress))
+      return () => ipcRenderer.removeListener('update-download-progress', callback)
+    },
+    onUpdateDownloaded: (callback: (info: any) => void) => {
+      ipcRenderer.on('update-downloaded', (_event, info) => callback(info))
+      return () => ipcRenderer.removeListener('update-downloaded', callback)
+    },
+    onUpdateError: (callback: (error: any) => void) => {
+      ipcRenderer.on('update-error', (_event, error) => callback(error))
+      return () => ipcRenderer.removeListener('update-error', callback)
+    }
+  }
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

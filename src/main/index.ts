@@ -4,6 +4,7 @@ import { pathToFileURL } from 'url'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createIPCHandler } from 'trpc-electron/main'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { appRouter } from './trpc/router'
 import { initDatabase, getDatabasePath } from './db'
@@ -55,6 +56,58 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
+// Configure auto-updater
+function setupAutoUpdater(mainWindow: BrowserWindow): void {
+  // 配置更新日志
+  autoUpdater.logger = console
+
+  // 在开发环境下不检查更新
+  if (is.dev || import.meta.env.VITE_APP_ENV !== 'prod') {
+    return
+  }
+
+  // 检查更新事件
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for update...')
+    mainWindow.webContents.send('update-checking')
+  })
+
+  // 发现新版本
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info)
+    mainWindow.webContents.send('update-available', info)
+  })
+
+  // 没有新版本
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('Update not available:', info)
+    mainWindow.webContents.send('update-not-available', info)
+  })
+
+  // 下载进度
+  autoUpdater.on('download-progress', (progressObj) => {
+    console.log(`Download progress: ${progressObj.percent}%`)
+    mainWindow.webContents.send('update-download-progress', progressObj)
+  })
+
+  // 下载完成
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded:', info)
+    mainWindow.webContents.send('update-downloaded', info)
+  })
+
+  // 错误处理
+  autoUpdater.on('error', (err) => {
+    console.error('Update error:', err)
+    mainWindow.webContents.send('update-error', err)
+  })
+
+  // 启动时检查更新
+  setTimeout(() => {
+    autoUpdater.checkForUpdates()
+  }, 3000)
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -91,6 +144,79 @@ app.whenReady().then(async () => {
 
   // Setup tRPC IPC handler
   createIPCHandler({ router: appRouter, windows: [mainWindow] })
+
+  // Setup auto-updater
+  setupAutoUpdater(mainWindow)
+
+  // IPC handler for manual update check
+  ipcMain.handle('check-for-updates', async () => {
+    if (is.dev) {
+      return { error: 'Updates are disabled in development mode' }
+    }
+
+    return new Promise((resolve) => {
+      let resolved = false
+
+      const onUpdateAvailable = (info: any) => {
+        if (!resolved) {
+          resolved = true
+          cleanup()
+          resolve({ success: true, updateInfo: info })
+        }
+      }
+
+      const onUpdateNotAvailable = (_info: any) => {
+        if (!resolved) {
+          resolved = true
+          cleanup()
+          resolve({ success: true, updateInfo: null })
+        }
+      }
+
+      const onError = (error: Error) => {
+        if (!resolved) {
+          resolved = true
+          cleanup()
+          resolve({ error: error.message })
+        }
+      }
+
+      const cleanup = () => {
+        autoUpdater.removeListener('update-available', onUpdateAvailable)
+        autoUpdater.removeListener('update-not-available', onUpdateNotAvailable)
+        autoUpdater.removeListener('error', onError)
+      }
+
+      // 设置超时
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          cleanup()
+          resolve({ error: 'Update check timed out' })
+        }
+      }, 30000) // 30秒超时
+
+      // 监听事件
+      autoUpdater.once('update-available', onUpdateAvailable)
+      autoUpdater.once('update-not-available', onUpdateNotAvailable)
+      autoUpdater.once('error', onError)
+
+      // 开始检查更新
+      autoUpdater.checkForUpdates().catch((error) => {
+        if (!resolved) {
+          resolved = true
+          cleanup()
+          clearTimeout(timeout)
+          resolve({ error: String(error) })
+        }
+      })
+    })
+  })
+
+  // IPC handler for installing update
+  ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall()
+  })
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
