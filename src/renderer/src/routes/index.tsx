@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
-  IconCloud,
-  IconFolder,
-  IconWorld,
   IconChevronRight,
   IconUpload,
   IconCopy,
@@ -29,7 +26,7 @@ import {
   TableRow
 } from '@/components/ui/table'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
-import { StatCard } from '@/components/dashboard/status-card'
+import { StatsGrid } from '@/components/dashboard/stats-grid'
 import { PageLayout } from '@/components/layout/page-layout'
 import { formatFileSize } from '@/lib/utils'
 import { getFileIcon } from '@/lib/file-utils'
@@ -233,23 +230,11 @@ function Index() {
   return (
     <PageLayout>
       {/* Stats Grid */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          title="Providers"
-          value={String(globalStats?.providersCount ?? 0)}
-          icon={<IconCloud size={20} />}
-        />
-        <StatCard
-          title="Buckets"
-          value={String(globalStats?.bucketsCount ?? 0)}
-          icon={<IconFolder size={20} />}
-        />
-        <StatCard
-          title="Regions"
-          value={String(globalStats?.regionsCount ?? 0)}
-          icon={<IconWorld size={20} />}
-        />
-      </div>
+      <StatsGrid
+        providersCount={globalStats?.providersCount}
+        bucketsCount={globalStats?.bucketsCount}
+        regionsCount={globalStats?.regionsCount}
+      />
 
       {/* Connected Providers */}
       <div className="mb-8">
