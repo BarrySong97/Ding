@@ -93,3 +93,24 @@ export const uploadHistory = pgTable(
 
 export type UploadHistoryRecord = typeof uploadHistory.$inferSelect
 export type NewUploadHistoryRecord = typeof uploadHistory.$inferInsert
+
+// Buckets table
+export const buckets = pgTable(
+  'buckets',
+  {
+    id: text('id').primaryKey(),
+    providerId: text('provider_id')
+      .notNull()
+      .references(() => providers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    customDomain: text('custom_domain'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    providerBucketIdx: index('buckets_provider_bucket_idx').on(table.providerId, table.name)
+  })
+)
+
+export type BucketRecord = typeof buckets.$inferSelect
+export type NewBucketRecord = typeof buckets.$inferInsert

@@ -195,7 +195,7 @@ export const providerRouter = router({
     return downloadToFile(input)
   }),
 
-  getPlainObjectUrl: publicProcedure.input(getPlainObjectUrlInputSchema).query(({ input }) => {
+  getPlainObjectUrl: publicProcedure.input(getPlainObjectUrlInputSchema).query(async ({ input }) => {
     return getPlainObjectUrl(input)
   }),
 

@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { CreateBucketDialog } from '@renderer/components/provider/create-bucket-dialog'
 import { DeleteBucketDialog } from '@renderer/components/provider/delete-bucket-dialog'
+import { BucketDomainDialog } from '@renderer/components/provider/bucket-domain-dialog'
 import { ProviderSettingsDialog } from '@renderer/components/provider/provider-settings-dialog'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { useBucketStore } from '@renderer/stores/bucket-store'
@@ -119,8 +120,10 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const { isLoading, isConnected, error, stats, refresh } = useProviderStatus(provider)
   const [createBucketOpen, setCreateBucketOpen] = useState(false)
   const [deleteBucketOpen, setDeleteBucketOpen] = useState(false)
+  const [bucketDomainOpen, setBucketDomainOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bucketToDelete, setBucketToDelete] = useState<string | null>(null)
+  const [bucketToEdit, setBucketToEdit] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const navigate = useNavigate()
 
@@ -175,6 +178,11 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
   const handleBucketDelete = (bucket: BucketInfo) => {
     setBucketToDelete(bucket.name)
     setDeleteBucketOpen(true)
+  }
+
+  const handleBucketEdit = (bucket: BucketInfo) => {
+    setBucketToEdit(bucket.name)
+    setBucketDomainOpen(true)
   }
 
   return (
@@ -318,6 +326,7 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
           <BucketTable
             buckets={stats?.buckets ?? []}
             onBucketClick={handleBucketClick}
+            onBucketEdit={handleBucketEdit}
             onBucketDelete={handleBucketDelete}
           />
         )}
@@ -339,6 +348,16 @@ function ProviderDetailContent({ provider }: { provider: TRPCProvider }) {
         bucketName={bucketToDelete}
         onSuccess={refresh}
       />
+
+      {/* Bucket Domain Dialog */}
+      {bucketToEdit && (
+        <BucketDomainDialog
+          providerId={provider.id}
+          bucketName={bucketToEdit}
+          open={bucketDomainOpen}
+          onOpenChange={setBucketDomainOpen}
+        />
+      )}
 
       {/* Provider Settings Dialog */}
       <ProviderSettingsDialog

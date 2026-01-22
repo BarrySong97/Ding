@@ -6,7 +6,7 @@ import {
   getPaginationRowModel,
   useReactTable
 } from '@tanstack/react-table'
-import { IconFolder, IconTrash } from '@tabler/icons-react'
+import { IconFolder, IconTrash, IconEdit } from '@tabler/icons-react'
 import {
   Table,
   TableBody,
@@ -27,6 +27,7 @@ export interface BucketInfo {
 interface BucketTableProps {
   buckets: BucketInfo[]
   onBucketClick?: (bucket: BucketInfo) => void
+  onBucketEdit?: (bucket: BucketInfo) => void
   onBucketDelete?: (bucket: BucketInfo) => void
   pageSize?: number
 }
@@ -34,6 +35,7 @@ interface BucketTableProps {
 export function BucketTable({
   buckets,
   onBucketClick,
+  onBucketEdit,
   onBucketDelete,
   pageSize = 10
 }: BucketTableProps) {
@@ -75,6 +77,17 @@ export function BucketTable({
       header: () => <div className="text-right">ACTIONS</div>,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:bg-muted/80"
+            onClick={(e) => {
+              e.stopPropagation()
+              onBucketEdit?.(row.original)
+            }}
+          >
+            <IconEdit size={16} />
+          </Button>
           <Button
             variant="ghost"
             size="icon"

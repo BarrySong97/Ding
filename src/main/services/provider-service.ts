@@ -1,6 +1,7 @@
 import type { Provider } from '@shared/schema/provider'
 import { createStorageAdapter } from '@main/adapters'
 import { uploadHistoryService } from './upload-history-service'
+import { bucketService } from './bucket-service'
 
 // ============ Re-export Types from Adapter ============
 export type {
@@ -320,8 +321,20 @@ export async function downloadToFile(input: DownloadToFileInput): Promise<Downlo
   }
 }
 
-export function getPlainObjectUrl(input: GetPlainObjectUrlInput): PlainObjectUrlResult {
+export async function getPlainObjectUrl(
+  input: GetPlainObjectUrlInput
+): Promise<PlainObjectUrlResult> {
   const { provider, bucket, key } = input
+
+  // Check bucket-level custom domain first
+  const customDomain = await bucketService.getBucketDomain(provider.id, bucket)
+  if (customDomain) {
+    const domain = customDomain.replace(/\/$/, '')
+    const encodedKey = key.split('/').map(encodeURIComponent).join('/')
+    return { url: `${domain}/${encodedKey}` }
+  }
+
+  // Fall back to existing provider-based logic
   const encodedKey = key.split('/').map(encodeURIComponent).join('/')
 
   switch (provider.type) {

@@ -15,6 +15,13 @@
       "when": 1768458651210,
       "tag": "0001_quick_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769050717505,
+      "tag": "0002_harsh_the_liberteens",
+      "breakpoints": true
     }
   ]
 }
