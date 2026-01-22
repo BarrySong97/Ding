@@ -82,14 +82,16 @@ export const uploadHistoryService = {
   async updateStatus(
     id: string,
     status: 'uploading' | 'completed' | 'error',
-    errorMessage?: string
+    errorMessage?: string,
+    size?: number
   ) {
     try {
-      const updated = await uploadHistoryRepository.updateStatus(id, status, errorMessage)
+      const updated = await uploadHistoryRepository.updateStatus(id, status, errorMessage, size)
       console.log('[uploadHistoryService] Upload status updated:', {
         id,
         status,
-        errorMessage
+        errorMessage,
+        size
       })
       return updated
     } catch (error) {

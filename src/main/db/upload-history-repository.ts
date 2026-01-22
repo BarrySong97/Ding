@@ -265,16 +265,24 @@ export const uploadHistoryRepository = {
   async updateStatus(
     id: string,
     status: 'uploading' | 'completed' | 'error',
-    errorMessage?: string
+    errorMessage?: string,
+    size?: number
   ): Promise<UploadHistoryRecord | null> {
     const db = getDatabase()
+    const updateData: any = {
+      status,
+      errorMessage: errorMessage ?? null,
+      updatedAt: new Date()
+    }
+
+    // Only update size if provided
+    if (typeof size === 'number') {
+      updateData.size = size
+    }
+
     const [updated] = await db
       .update(schema.uploadHistory)
-      .set({
-        status,
-        errorMessage: errorMessage ?? null,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(schema.uploadHistory.id, id))
       .returning()
     return updated || null

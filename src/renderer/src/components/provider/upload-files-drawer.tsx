@@ -530,7 +530,7 @@ export function UploadFilesDrawer({
             key,
             name: filename,
             type: 'file',
-            size: file.size,
+            size: undefined, // Size will be updated after upload
             mimeType: 'image/webp',
             uploadSource: 'app',
             isCompressed: true,
@@ -587,16 +587,21 @@ export function UploadFilesDrawer({
           })
 
           if (result.success) {
+            // Calculate actual blurhash file size from base64 content
+            const actualFileSize = Math.ceil(blurResult.content.length * 0.75) // Convert base64 to actual bytes
+
             updateTask(taskId, {
               status: 'completed',
               progress: 100,
-              outputKey: key
+              outputKey: key,
+              compressedSize: actualFileSize
             })
-            // Update DB record status to completed
+            // Update DB record status to completed with actual file size
             if (dbRecordId) {
               await updateStatusMutation.mutateAsync({
                 id: dbRecordId,
-                status: 'completed'
+                status: 'completed',
+                size: actualFileSize
               })
             }
           } else {

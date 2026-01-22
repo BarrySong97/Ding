@@ -42,7 +42,8 @@ export const createRecordInputSchema = z.object({
 export const updateStatusInputSchema = z.object({
   id: z.string(),
   status: z.enum(['uploading', 'completed', 'error']),
-  errorMessage: z.string().optional()
+  errorMessage: z.string().optional(),
+  size: z.number().optional()
 })
 
 // ============ Type Exports ============

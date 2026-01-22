@@ -34,7 +34,7 @@ export const uploadHistoryRouter = router({
    * Update upload status
    */
   updateStatus: publicProcedure.input(updateStatusInputSchema).mutation(async ({ input }) => {
-    return uploadHistoryService.updateStatus(input.id, input.status, input.errorMessage)
+    return uploadHistoryService.updateStatus(input.id, input.status, input.errorMessage, input.size)
   }),
 
   /**
