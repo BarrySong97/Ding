@@ -1,9 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import {
-  IconChevronRight,
-  IconUpload
-} from '@tabler/icons-react'
+import { IconChevronRight, IconUpload } from '@tabler/icons-react'
 import { type ProviderType } from '@renderer/db'
 import { EmptyState } from '@/components/provider/empty-state'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
@@ -19,6 +16,8 @@ import { PageLayout } from '@/components/layout/page-layout'
 import { toast } from '@/hooks/use-toast'
 import { DashboardSkeleton } from '@/components/ui/page-skeletons'
 import { UploadHistoryTable } from '@/components/upload-history/upload-history-table'
+import { UploadZone } from '@/components/upload/upload-zone'
+import { useGlobalUploadStore } from '@renderer/stores/global-upload-store'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -41,6 +40,7 @@ function Index() {
   const { data: providers, isLoading } = trpc.provider.list.useQuery()
   const { data: globalStats } = trpc.provider.getGlobalStats.useQuery()
   const trpcUtils = trpc.useUtils()
+  const openWithFiles = useGlobalUploadStore((state) => state.openWithFiles)
 
   // Download mutations
   const showSaveDialogMutation = trpc.provider.showSaveDialog.useMutation()
@@ -212,12 +212,23 @@ function Index() {
   // Has providers - show list
   return (
     <PageLayout>
+      {/* Upload Area */}
+      <div className="mb-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">Upload Area</h2>
+          </div>
+        </div>
+        <UploadZone onFilesSelected={(files) => openWithFiles(files)} />
+      </div>
       {/* Stats Grid */}
       <StatsGrid
         providersCount={globalStats?.providersCount}
         bucketsCount={globalStats?.bucketsCount}
         regionsCount={globalStats?.regionsCount}
       />
+
+
 
       {/* Connected Providers */}
       <div className="mb-8">

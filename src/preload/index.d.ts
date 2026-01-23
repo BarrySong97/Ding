@@ -30,6 +30,8 @@ declare global {
       getAppVersion: () => Promise<string>
       showInFolder: (filePath: string) => Promise<void>
       getDatabasePath: () => Promise<string>
+      readFile: (filePath: string) => Promise<{ name: string; mimeType: string; data: Uint8Array }>
+      onOpenFiles: (callback: (filePaths: string[]) => void) => () => void
       updater: {
         checkForUpdates: () => Promise<{ success?: boolean; error?: string; updateInfo?: any }>
         downloadUpdate: () => Promise<void>

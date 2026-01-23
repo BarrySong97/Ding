@@ -1,6 +1,8 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
+import { join, basename, extname } from 'path'
 import { pathToFileURL } from 'url'
+import { promises as fs } from 'fs'
+import { existsSync, statSync } from 'fs'
 
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { createIPCHandler } from 'trpc-electron/main'
@@ -12,6 +14,98 @@ import { initializeBuiltInPresets } from './services/preset-service'
 
 // 导入 package.json 获取版本号
 import packageInfo from '../../package.json'
+
+const pendingOpenFiles = new Set<string>()
+
+function getMimeTypeFromPath(filePath: string): string {
+  const extension = extname(filePath).toLowerCase()
+  switch (extension) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.png':
+      return 'image/png'
+    case '.webp':
+      return 'image/webp'
+    case '.gif':
+      return 'image/gif'
+    case '.bmp':
+      return 'image/bmp'
+    case '.svg':
+      return 'image/svg+xml'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+function normalizeOpenFiles(paths: string[]): string[] {
+  const results: string[] = []
+  const seen = new Set<string>()
+
+  for (const rawPath of paths) {
+    if (!rawPath || rawPath.startsWith('-')) continue
+    if (!existsSync(rawPath)) continue
+    try {
+      const stats = statSync(rawPath)
+      if (!stats.isFile()) continue
+    } catch {
+      continue
+    }
+    if (seen.has(rawPath)) continue
+    seen.add(rawPath)
+    results.push(rawPath)
+  }
+
+  return results
+}
+
+function getOpenFileArgs(args: string[]): string[] {
+  if (!args || args.length === 0) return []
+  return normalizeOpenFiles(args.slice(1))
+}
+
+function sendOpenFiles(paths: string[]): void {
+  if (paths.length === 0) return
+  const windows = BrowserWindow.getAllWindows()
+  if (windows.length === 0) {
+    paths.forEach((filePath) => pendingOpenFiles.add(filePath))
+    return
+  }
+  const hasLoadingWindow = windows.some((window) => window.webContents.isLoading())
+  if (hasLoadingWindow) {
+    paths.forEach((filePath) => pendingOpenFiles.add(filePath))
+    return
+  }
+  windows.forEach((window) => {
+    window.webContents.send('open-files', paths)
+  })
+}
+
+function handleOpenFiles(paths: string[]): void {
+  const normalized = normalizeOpenFiles(paths)
+  if (normalized.length === 0) return
+  sendOpenFiles(normalized)
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    handleOpenFiles(getOpenFileArgs(commandLine))
+    const window = BrowserWindow.getAllWindows()[0]
+    if (window) {
+      if (window.isMinimized()) window.restore()
+      window.focus()
+    }
+  })
+}
+
+app.on('open-file', (event, filePath) => {
+  // macOS hook (kept for future)
+  event.preventDefault()
+  handleOpenFiles([filePath])
+})
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -151,7 +245,25 @@ app.whenReady().then(async () => {
     return packageInfo.version
   })
 
+  ipcMain.handle('read-file', async (_event, filePath: string) => {
+    const buffer = await fs.readFile(filePath)
+    return {
+      name: basename(filePath),
+      mimeType: getMimeTypeFromPath(filePath),
+      data: buffer
+    }
+  })
+
   const mainWindow = createWindow()
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (pendingOpenFiles.size > 0) {
+      const queued = Array.from(pendingOpenFiles)
+      pendingOpenFiles.clear()
+      sendOpenFiles(queued)
+    }
+  })
+
+  handleOpenFiles(getOpenFileArgs(process.argv))
 
   // Setup tRPC IPC handler
   createIPCHandler({ router: appRouter, windows: [mainWindow] })
@@ -230,7 +342,7 @@ app.whenReady().then(async () => {
 
   // IPC handler for installing update
   ipcMain.handle('install-update', () => {
-    autoUpdater.quitAndInstall()
+    autoUpdater.quitAndInstall(true, true)
   })
 
   // IPC handler for downloading update

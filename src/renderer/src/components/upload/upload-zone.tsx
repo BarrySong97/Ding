@@ -50,7 +50,7 @@ export function UploadZone({ onFilesSelected, className }: UploadZoneProps) {
       onDrop={handleDrop}
       onClick={handleClick}
       className={cn(
-        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors',
+        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors',
         isDragging
           ? 'border-primary bg-primary/5'
           : 'border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50',
@@ -77,10 +77,17 @@ export function UploadZone({ onFilesSelected, className }: UploadZoneProps) {
         )}
       </div>
       <p className="mb-2 text-lg font-medium">
-        {isDragging ? 'Drop files here' : 'Drag and drop files here'}
+        {isDragging ? 'Drop to upload' : 'Drag files anywhere in the app'}
       </p>
       <p className="mb-4 text-sm text-muted-foreground">or</p>
-      <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={(event) => {
+          event.stopPropagation()
+          handleClick()
+        }}
+      >
         Browse Files
       </Button>
     </div>

@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/header'
 import { UploadFAB, UploadManagerDrawer } from '@/components/upload-manager'
 import { DownloadFAB, DownloadManagerDrawer } from '@/components/download-manager'
 import { GlobalAutoUpdateChecker } from '@/components/global-auto-update-checker'
+import { GlobalUploadController } from '@/components/upload/global-upload-controller'
 import { Toaster } from 'sonner'
 import { cn } from '@renderer/lib/utils'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -34,6 +35,7 @@ export const Route = createRootRoute({
           </SidebarInset>
           <Toaster />
           <GlobalAutoUpdateChecker />
+          <GlobalUploadController />
           <DownloadFAB />
           <DownloadManagerDrawer />
           <UploadFAB />

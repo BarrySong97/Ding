@@ -13,7 +13,6 @@ import {
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { FileList } from '@renderer/components/file-browser/file-list'
-import { UploadFilesDrawer } from '@renderer/components/provider/upload-files-drawer'
 import { CreateFolderDialog } from '@renderer/components/provider/create-folder-dialog'
 import { DeleteConfirmDialog } from '@renderer/components/provider/delete-confirm-dialog'
 import { RenameDialog } from '@renderer/components/provider/rename-dialog'
@@ -47,6 +46,7 @@ import type { FileItem } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
 import { useNavigationStore } from '@renderer/stores/navigation-store'
 import { useDownloadStore } from '@renderer/stores/download-store'
+import { useGlobalUploadStore } from '@renderer/stores/global-upload-store'
 import { useDownloadFile } from '@/hooks/use-download-file'
 
 interface BucketBrowserProps {
@@ -60,8 +60,7 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
 
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([])
-  const [uploadDrawerOpen, setUploadDrawerOpen] = useState(false)
-  const [selectedUploadFiles, setSelectedUploadFiles] = useState<File[]>([])
+  const openWithFiles = useGlobalUploadStore((state) => state.openWithFiles)
   const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
@@ -345,8 +344,20 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
 
   // Upload drop zone handlers
   const handleUploadFiles = (files: File[]) => {
-    setSelectedUploadFiles(files)
-    setUploadDrawerOpen(true)
+    openWithFiles(files, {
+      onUploadStart: () => {
+        console.log('[BucketBrowser] Upload started:', {
+          bucket,
+          prefix,
+          fileCount: files.length,
+          path
+        })
+      },
+      onUploadComplete: () => {
+        console.log('[BucketBrowser] Upload completed, refreshing...')
+        refetch()
+      }
+    })
   }
 
   const handleDropZoneDragOver = (e: React.DragEvent) => {
@@ -605,29 +616,6 @@ export function BucketBrowser({ provider, bucket }: BucketBrowserProps) {
       )}
 
       {/* Dialogs */}
-      <UploadFilesDrawer
-        open={uploadDrawerOpen}
-        onOpenChange={setUploadDrawerOpen}
-        files={selectedUploadFiles}
-        provider={provider}
-        bucket={bucket}
-        prefix={prefix}
-        onUploadStart={() => {
-          console.log('[BucketBrowser] Upload started:', {
-            bucket,
-            prefix,
-            fileCount: selectedUploadFiles.length,
-            path
-          })
-          // Close dialogs and clear selection on upload start
-          setSelectedUploadFiles([])
-        }}
-        onUploadComplete={() => {
-          console.log('[BucketBrowser] Upload completed, refreshing...')
-          // Refresh the file list after all uploads complete
-          refetch()
-        }}
-      />
       <CreateFolderDialog
         open={createFolderDialogOpen}
         onOpenChange={setCreateFolderDialogOpen}

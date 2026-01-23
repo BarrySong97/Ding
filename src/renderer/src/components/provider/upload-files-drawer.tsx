@@ -38,16 +38,18 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { ImageCropper } from '@/components/ui/image-cropper'
+import { FolderPickerDialog } from '@/components/provider/folder-picker-dialog'
 import { useUploadStore } from '@renderer/stores/upload-store'
-import { formatFileSize } from '@/lib/utils'
+import { cn, formatFileSize } from '@/lib/utils'
 
 interface UploadFilesDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   files: File[]
-  provider: TRPCProvider
-  bucket: string
+  provider?: TRPCProvider
+  bucket?: string
   prefix?: string
+  lockTarget?: boolean
   onUploadStart: () => void
   onUploadComplete?: () => void
 }
@@ -83,6 +85,34 @@ function isImageFile(file: File): boolean {
   )
 }
 
+function normalizePrefix(value?: string): string {
+  if (!value) return ''
+  const trimmed = value.replace(/^\/+/, '')
+  if (!trimmed) return ''
+  return trimmed.endsWith('/') ? trimmed : `${trimmed}/`
+}
+
+function formatPrefixLabel(prefix?: string): string {
+  const normalized = normalizePrefix(prefix)
+  return normalized ? `/${normalized.replace(/\/$/, '')}` : '/ (root)'
+}
+
+function fileKey(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`
+}
+
+function createUploadFileItem(file: File): UploadFileItem {
+  const isImage = isImageFile(file)
+  return {
+    file,
+    previewUrl: isImage ? URL.createObjectURL(file) : '',
+    selectedPreset: null,
+    croppedContent: null,
+    needsCrop: false,
+    isImage
+  }
+}
+
 export function UploadFilesDrawer({
   open,
   onOpenChange,
@@ -90,6 +120,7 @@ export function UploadFilesDrawer({
   provider,
   bucket,
   prefix,
+  lockTarget,
   onUploadStart,
   onUploadComplete
 }: UploadFilesDrawerProps) {
@@ -100,8 +131,29 @@ export function UploadFilesDrawer({
   const [cropperOpen, setCropperOpen] = useState(false)
   const [currentCropIndex, setCurrentCropIndex] = useState<number | null>(null)
   const [maxConcurrent, setLocalMaxConcurrent] = useState(5) // Default 5 concurrent uploads
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null)
+  const [selectedBucket, setSelectedBucket] = useState<string | null>(null)
+  const [selectedPrefix, setSelectedPrefix] = useState('')
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  const isTargetLocked = lockTarget ?? Boolean(provider && bucket)
+  const normalizedContextPrefix = useMemo(() => normalizePrefix(prefix), [prefix])
 
   const { data: presets, isLoading: presetsLoading } = trpc.preset.list.useQuery()
+  const { data: providers, isLoading: providersLoading } = trpc.provider.list.useQuery(undefined, {
+    enabled: open && !isTargetLocked
+  })
+  const selectedProvider = useMemo(
+    () => providers?.find((item) => item.id === selectedProviderId) ?? null,
+    [providers, selectedProviderId]
+  )
+  const { data: buckets, isLoading: bucketsLoading } = trpc.provider.listBuckets.useQuery(
+    { provider: selectedProvider as TRPCProvider },
+    {
+      enabled: open && !isTargetLocked && Boolean(selectedProvider)
+    }
+  )
   const uploadMutation = trpc.provider.uploadFile.useMutation()
   const compressMutation = trpc.image.compress.useMutation()
   const blurHashMutation = trpc.image.generateBlurHash.useMutation()
@@ -109,36 +161,38 @@ export function UploadFilesDrawer({
   const updateStatusMutation = trpc.uploadHistory.updateStatus.useMutation()
   const trpcUtils = trpc.useUtils()
 
-  const { addTask, updateTask, setDrawerOpen: setUploadDrawerOpen, setMaxConcurrent, maxConcurrent: storeConcurrent } = useUploadStore()
+  const {
+    addTask,
+    updateTask,
+    setDrawerOpen: setUploadDrawerOpen,
+    setMaxConcurrent,
+    maxConcurrent: storeConcurrent
+  } = useUploadStore()
 
   // Initialize file items when files change
   useEffect(() => {
-    if (!open || files.length === 0) {
-      setFileItems([])
-      return
-    }
+    if (!open || files.length === 0) return
 
-    const newItems: UploadFileItem[] = files.map((file) => {
-      const isImage = isImageFile(file)
-      return {
-        file,
-        previewUrl: isImage ? URL.createObjectURL(file) : '',
-        selectedPreset: null,
-        croppedContent: null,
-        needsCrop: false,
-        isImage
-      }
+    setFileItems((prev) => {
+      const existingKeys = new Set(prev.map((item) => fileKey(item.file)))
+      const nextItems = files
+        .filter((file) => !existingKeys.has(fileKey(file)))
+        .map(createUploadFileItem)
+      return nextItems.length > 0 ? [...prev, ...nextItems] : prev
     })
-    setFileItems(newItems)
+  }, [open, files])
 
-    return () => {
-      newItems.forEach((item) => {
+  useEffect(() => {
+    if (open) return
+    setFileItems((prev) => {
+      prev.forEach((item) => {
         if (item.previewUrl) {
           URL.revokeObjectURL(item.previewUrl)
         }
       })
-    }
-  }, [open, files])
+      return []
+    })
+  }, [open])
 
   // Reset state when drawer opens
   useEffect(() => {
@@ -149,6 +203,36 @@ export function UploadFilesDrawer({
       setLocalMaxConcurrent(storeConcurrent) // Initialize from store
     }
   }, [open, storeConcurrent])
+
+  useEffect(() => {
+    if (!open) return
+    if (isTargetLocked) {
+      setSelectedProviderId(provider?.id ?? null)
+      setSelectedBucket(bucket ?? null)
+      setSelectedPrefix(normalizedContextPrefix)
+      return
+    }
+    setSelectedProviderId(null)
+    setSelectedBucket(null)
+    setSelectedPrefix('')
+  }, [open, isTargetLocked, provider?.id, bucket, normalizedContextPrefix])
+
+  useEffect(() => {
+    if (!open || isTargetLocked) return
+    setSelectedBucket(null)
+    setSelectedPrefix('')
+  }, [selectedProviderId, open, isTargetLocked])
+
+  useEffect(() => {
+    if (!open || isTargetLocked) return
+    setSelectedPrefix('')
+  }, [selectedBucket, open, isTargetLocked])
+
+  useEffect(() => {
+    if (!open) {
+      setFolderPickerOpen(false)
+    }
+  }, [open])
 
   // Update needsCrop when preset changes
   const updatePreset = (index: number, presetId: string) => {
@@ -196,6 +280,17 @@ export function UploadFilesDrawer({
     })
   }
 
+  const appendFiles = (incoming: File[]) => {
+    if (incoming.length === 0) return
+    setFileItems((prev) => {
+      const existingKeys = new Set(prev.map((item) => fileKey(item.file)))
+      const nextItems = incoming
+        .filter((file) => !existingKeys.has(fileKey(file)))
+        .map(createUploadFileItem)
+      return nextItems.length > 0 ? [...prev, ...nextItems] : prev
+    })
+  }
+
   const openCropper = (index: number) => {
     setCurrentCropIndex(index)
     setCropperOpen(true)
@@ -235,6 +330,20 @@ export function UploadFilesDrawer({
     [fileItems]
   )
 
+  const targetProvider = isTargetLocked ? (provider ?? null) : selectedProvider
+  const targetBucket = isTargetLocked ? (bucket ?? null) : selectedBucket
+  const targetPrefix = isTargetLocked ? normalizedContextPrefix : selectedPrefix
+  const canBrowseFolders = Boolean(selectedProvider && selectedBucket)
+
+  const resolveUploadTarget = () => {
+    if (!targetProvider || !targetBucket) return null
+    return {
+      provider: targetProvider,
+      bucket: targetBucket,
+      prefix: targetPrefix ? normalizePrefix(targetPrefix) : undefined
+    }
+  }
+
   // Concurrency limiter helper - limits concurrent async operations
   const createConcurrencyLimiter = (limit: number) => {
     let running = 0
@@ -257,7 +366,10 @@ export function UploadFilesDrawer({
   }
 
   // Process a single file item (handles all its uploads: compression, original, blurhash)
-  const processFileItem = async (item: UploadFileItem) => {
+  const processFileItem = async (
+    item: UploadFileItem,
+    target: { provider: TRPCProvider; bucket: string; prefix?: string }
+  ) => {
     const file = item.file
     const originalContent = await fileToBase64(file)
     const originalFilename = file.name
@@ -290,9 +402,9 @@ export function UploadFilesDrawer({
         file,
         fileName: file.name,
         fileSize: file.size,
-        providerId: provider.id,
-        bucket,
-        prefix,
+        providerId: target.provider.id,
+        bucket: target.bucket,
+        prefix: target.prefix,
         status: 'compressing',
         progress: 0,
         compressionEnabled: true,
@@ -319,12 +431,12 @@ export function UploadFilesDrawer({
           const preset = presets?.find((p) => p.id === presetId)
           const presetName = preset?.name || presetId
           const filename = `${baseName}_${presetName}_${compressResult.width}x${compressResult.height}.${actualExt}`
-          const key = prefix ? `${prefix}${filename}` : filename
+          const key = target.prefix ? `${target.prefix}${filename}` : filename
 
           try {
             const dbRecord = await createRecordMutation.mutateAsync({
-              providerId: provider.id,
-              bucket,
+              providerId: target.provider.id,
+              bucket: target.bucket,
               key,
               name: filename,
               type: 'file',
@@ -351,16 +463,16 @@ export function UploadFilesDrawer({
           })
 
           console.log('[ImageUpload] Uploading compressed image:', {
-            bucket,
+            bucket: target.bucket,
             key,
-            prefix,
+            prefix: target.prefix,
             filename,
             preset: presetId
           })
 
           const result = await uploadMutation.mutateAsync({
-            provider,
-            bucket,
+            provider: target.provider,
+            bucket: target.bucket,
             key,
             content: compressResult.content,
             contentType: `image/${compressResult.format}`
@@ -433,20 +545,19 @@ export function UploadFilesDrawer({
       const baseName =
         originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
       const ext = originalFilename.substring(originalFilename.lastIndexOf('.') + 1)
-      const hasDimensions =
-        typeof originalWidth === 'number' && typeof originalHeight === 'number'
+      const hasDimensions = typeof originalWidth === 'number' && typeof originalHeight === 'number'
       const filename =
         shouldCompress && isImage
           ? `${baseName}_original${hasDimensions ? `_${originalWidth}x${originalHeight}` : ''}.${ext}`
           : originalFilename
-      const key = prefix ? `${prefix}${filename}` : filename
+      const key = target.prefix ? `${target.prefix}${filename}` : filename
 
       // Create DB record first with 'uploading' status
       let dbRecordId: string | undefined
       try {
         const dbRecord = await createRecordMutation.mutateAsync({
-          providerId: provider.id,
-          bucket,
+          providerId: target.provider.id,
+          bucket: target.bucket,
           key,
           name: filename,
           type: 'file',
@@ -466,9 +577,9 @@ export function UploadFilesDrawer({
         file,
         fileName: file.name,
         fileSize: file.size,
-        providerId: provider.id,
-        bucket,
-        prefix,
+        providerId: target.provider.id,
+        bucket: target.bucket,
+        prefix: target.prefix,
         status: 'uploading',
         progress: 0,
         compressionEnabled: false,
@@ -480,15 +591,15 @@ export function UploadFilesDrawer({
 
       try {
         console.log('[ImageUpload] Uploading original file:', {
-          bucket,
+          bucket: target.bucket,
           key,
-          prefix,
+          prefix: target.prefix,
           filename
         })
 
         const result = await uploadMutation.mutateAsync({
-          provider,
-          bucket,
+          provider: target.provider,
+          bucket: target.bucket,
           key,
           content: originalContent,
           contentType: originalContentType
@@ -544,14 +655,14 @@ export function UploadFilesDrawer({
       const baseName =
         originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename
       const filename = `${baseName}_blurhash.webp`
-      const key = prefix ? `${prefix}${filename}` : filename
+      const key = target.prefix ? `${target.prefix}${filename}` : filename
 
       // Create DB record first with 'uploading' status
       let dbRecordId: string | undefined
       try {
         const dbRecord = await createRecordMutation.mutateAsync({
-          providerId: provider.id,
-          bucket,
+          providerId: target.provider.id,
+          bucket: target.bucket,
           key,
           name: filename,
           type: 'file',
@@ -572,9 +683,9 @@ export function UploadFilesDrawer({
         file,
         fileName: `${file.name} (blurhash)`,
         fileSize: file.size,
-        providerId: provider.id,
-        bucket,
-        prefix,
+        providerId: target.provider.id,
+        bucket: target.bucket,
+        prefix: target.prefix,
         status: 'compressing',
         progress: 0,
         compressionEnabled: true,
@@ -597,15 +708,15 @@ export function UploadFilesDrawer({
         })
 
         console.log('[ImageUpload] Uploading blurhash:', {
-          bucket,
+          bucket: target.bucket,
           key,
-          prefix,
+          prefix: target.prefix,
           filename
         })
 
         const result = await uploadMutation.mutateAsync({
-          provider,
-          bucket,
+          provider: target.provider,
+          bucket: target.bucket,
           key,
           content: blurResult.content,
           contentType: 'image/webp'
@@ -662,7 +773,11 @@ export function UploadFilesDrawer({
     }
   }
 
-  const processUploads = async () => {
+  const processUploads = async (target: {
+    provider: TRPCProvider
+    bucket: string
+    prefix?: string
+  }) => {
     // Update store with the selected concurrency level
     setMaxConcurrent(maxConcurrent)
 
@@ -670,9 +785,7 @@ export function UploadFilesDrawer({
     const limiter = createConcurrencyLimiter(maxConcurrent)
 
     // Create promise for each file item
-    const uploadPromises = fileItems.map((item) =>
-      limiter.run(() => processFileItem(item))
-    )
+    const uploadPromises = fileItems.map((item) => limiter.run(() => processFileItem(item, target)))
 
     // Wait for all uploads to complete (with error handling)
     await Promise.allSettled(uploadPromises)
@@ -681,9 +794,8 @@ export function UploadFilesDrawer({
     onUploadComplete?.()
   }
   const handleStartUpload = () => {
-    if (fileItems.length === 0) {
-      return
-    }
+    const target = resolveUploadTarget()
+    if (!target || fileItems.length === 0) return
 
     // Close drawer immediately
     onOpenChange(false)
@@ -693,15 +805,46 @@ export function UploadFilesDrawer({
     setUploadDrawerOpen(true)
 
     // Run uploads in background (non-blocking)
-    processUploads()
+    processUploads(target)
   }
 
-  const canUpload = fileItems.length > 0 && !isUploading
+  const canUpload = fileItems.length > 0 && !isUploading && Boolean(targetProvider && targetBucket)
+
+  const handleDrawerDragOver = (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDrawerDragLeave = (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrawerDrop = (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDragOver(false)
+    appendFiles(Array.from(event.dataTransfer.files))
+  }
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="p-0 flex min-h-0 flex-col !h-[85vh] rounded-t-md">
+        <SheetContent
+          side="bottom"
+          className={cn(
+            'p-0 flex min-h-0 flex-col !h-[85vh] rounded-t-md transition-colors',
+            isDragOver && 'ring-2 ring-primary/40'
+          )}
+          onDragOver={handleDrawerDragOver}
+          onDragLeave={handleDrawerDragLeave}
+          onDrop={handleDrawerDrop}
+        >
           <SheetHeader className="p-4 pb-2">
             <SheetTitle className="flex items-center gap-2">
               <IconUpload size={20} className="text-blue-500" />
@@ -714,6 +857,115 @@ export function UploadFilesDrawer({
 
           <ScrollArea className="min-h-0 flex-1 px-4">
             <div className="space-y-4 pb-4">
+              <div className="rounded-md border bg-muted/30 p-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Upload destination</Label>
+                  {isTargetLocked && (
+                    <span className="text-xs text-muted-foreground">
+                      Auto-filled from current bucket
+                    </span>
+                  )}
+                </div>
+                {isTargetLocked ? (
+                  <div className="mt-2 space-y-1 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Provider</span>
+                      <span className="font-medium">{provider?.name || 'Loading provider...'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Bucket</span>
+                      <span className="font-medium">{bucket || '-'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Folder</span>
+                      <span className="font-medium">{formatPrefixLabel(targetPrefix)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Provider</Label>
+                        <Select
+                          value={selectedProviderId || undefined}
+                          onValueChange={(value) => setSelectedProviderId(value)}
+                          disabled={providersLoading}
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                providersLoading ? 'Loading providers...' : 'Select provider'
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {providers?.map((item) => (
+                              <SelectItem key={item.id} value={item.id}>
+                                {item.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Bucket</Label>
+                        <Select
+                          value={selectedBucket || undefined}
+                          onValueChange={(value) => setSelectedBucket(value)}
+                          disabled={!selectedProvider || bucketsLoading}
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                !selectedProvider
+                                  ? 'Select provider first'
+                                  : bucketsLoading
+                                    ? 'Loading buckets...'
+                                    : 'Select bucket'
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {buckets?.map((item) => (
+                              <SelectItem key={item.name} value={item.name}>
+                                {item.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Folder</Label>
+                        <div className="text-sm font-medium">
+                          {formatPrefixLabel(selectedPrefix)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedPrefix && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedPrefix('')}
+                            disabled={!canBrowseFolders}
+                          >
+                            Root
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFolderPickerOpen(true)}
+                          disabled={!canBrowseFolders}
+                        >
+                          Browse
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               {/* Image table */}
               {presetsLoading ? (
                 <div className="space-y-2">
@@ -939,6 +1191,17 @@ export function UploadFilesDrawer({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {selectedProvider && selectedBucket && (
+        <FolderPickerDialog
+          open={folderPickerOpen}
+          onOpenChange={setFolderPickerOpen}
+          provider={selectedProvider}
+          bucket={selectedBucket}
+          initialPrefix={selectedPrefix}
+          onConfirm={(nextPrefix) => setSelectedPrefix(nextPrefix)}
+        />
+      )}
 
       {/* Image Cropper Dialog */}
       {currentCropItem && (
