@@ -104,10 +104,10 @@ function FileListRow({
           />
         </TableCell>
       )}
-      <TableCell>
-        <div className="flex items-center gap-3">
-          {getFileIcon(file, 'small')}
-          <span className="font-medium">{file.name}</span>
+      <TableCell className="max-w-64">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex-shrink-0">{getFileIcon(file, 'small')}</div>
+          <span className="font-medium truncate">{file.name}</span>
         </div>
       </TableCell>
       <TableCell className="text-muted-foreground">

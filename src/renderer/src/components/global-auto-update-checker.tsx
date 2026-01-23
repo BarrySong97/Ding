@@ -76,26 +76,14 @@ export function GlobalAutoUpdateChecker() {
     const unsubDownloaded = window.api.updater.onUpdateDownloaded((info) => {
       console.log('Update downloaded:', info)
 
-      // 关闭下载进度 toast
-      toast.dismiss('update-download-progress')
-
-      // 显示更新就绪通知
-      toast.success('Update ready to install', {
-        description: `Version ${info.version} has been downloaded`,
-        duration: Infinity,
-        action: {
-          label: 'Restart Now',
-          onClick: () => {
-            window.api.updater.installUpdate()
-          }
-        },
-        cancel: {
-          label: 'Later',
-          onClick: () => {
-            // 用户选择稍后重启
-          }
-        }
+      // 更新 toast 为安装中状态
+      toast.loading('Installing update...', {
+        id: 'update-download-progress',
+        description: `Version ${info.version} - App will restart shortly`
       })
+
+      // 自动安装更新并重启
+      window.api.updater.installUpdate()
     })
 
     const unsubError = window.api.updater.onUpdateError((error) => {

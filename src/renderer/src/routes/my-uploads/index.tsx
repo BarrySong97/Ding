@@ -8,21 +8,16 @@ import {
   IconTrash,
   IconFile,
   IconDatabase,
-  IconClock,
-  IconCheck,
-  IconX,
-  IconCopy
+  IconClock
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { useDebouncedValue } from '@/hooks/use-debounce'
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { FileDetailSheet } from '@/components/provider/file-detail-sheet'
 import type { FileItem } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import {
   AlertDialog,
@@ -34,20 +29,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table'
 import { format } from 'date-fns'
 import { cn, formatFileSize } from '@/lib/utils'
-import { getFileIcon } from '@/lib/file-utils'
 import { PageLayout } from '@/components/layout/page-layout'
 import { StatCard } from '@/components/dashboard/status-card'
 import { MyUploadsPageSkeleton } from '@/components/ui/page-skeletons'
+import { UploadHistoryTable } from '@/components/upload-history/upload-history-table'
 
 export const Route = createFileRoute('/my-uploads/')({
   component: MyUploadsPage
@@ -517,34 +504,6 @@ function MyUploadsPage() {
     }
   }
 
-  const renderStatusBadge = (status: string, errorMessage?: string | null) => {
-    switch (status) {
-      case 'completed':
-        return (
-          <Badge variant="default" className="bg-green-500">
-            <IconCheck size={14} className="mr-1" />
-            Completed
-          </Badge>
-        )
-      case 'error':
-        return (
-          <Badge variant="destructive" title={errorMessage ?? undefined}>
-            <IconX size={14} className="mr-1" />
-            Failed
-          </Badge>
-        )
-      case 'uploading':
-        return (
-          <Badge variant="secondary">
-            <IconRefresh size={14} className="mr-1 animate-spin" />
-            Uploading
-          </Badge>
-        )
-      default:
-        return <Badge variant="secondary">Pending</Badge>
-    }
-  }
-
   // Loading state
   if (isLoading) {
     return <MyUploadsPageSkeleton />
@@ -608,65 +567,21 @@ function MyUploadsPage() {
 
         {data && data.data.length > 0 ? (
           <>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={
-                          data.data.length > 0 &&
-                          (data.data.every((item) => selectedItems[item.id])
-                            ? true
-                            : data.data.some((item) => selectedItems[item.id])
-                              ? 'indeterminate'
-                              : false)
-                        }
-                        onCheckedChange={(value) =>
-                          handleToggleAll(value === true || value === 'indeterminate')
-                        }
-                        aria-label="Select all"
-                      />
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Name
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Bucket
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Size
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Uploaded
-                    </TableHead>
-                    <TableHead className="w-24" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.data.map((item) => (
-                    <UploadHistoryRow
-                      key={item.id}
-                      item={{
-                        ...item,
-                        type: item.type as 'file' | 'folder'
-                      }}
-                      isSelected={!!selectedItems[item.id]}
-                      onRowClick={handleRowClick}
-                      onToggleSelection={handleToggleSelection}
-                      onDownload={handleDownload}
-                      onCopyUrl={getCopyUrl}
-                      onDelete={setDeleteTarget}
-                      isDeleting={deleteObjectMutation.isPending}
-                      renderStatusBadge={renderStatusBadge}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <UploadHistoryTable
+              data={data.data.map((item) => ({
+                ...item,
+                type: item.type as 'file' | 'folder'
+              }))}
+              selectable={true}
+              selectedItems={selectedItems}
+              onToggleSelection={handleToggleSelection}
+              onToggleAll={handleToggleAll}
+              onRowClick={handleRowClick}
+              onDownload={handleDownload}
+              onCopyUrl={getCopyUrl}
+              onDelete={setDeleteTarget}
+              isDeleting={deleteObjectMutation.isPending}
+            />
 
             {/* Pagination */}
             {data.totalPages > 1 && (
@@ -786,175 +701,5 @@ function MyUploadsPage() {
         bucket={selectedFileDetail?.bucket ?? ''}
       />
     </PageLayout>
-  )
-}
-
-// Upload history row component with copy hook
-interface UploadHistoryRowProps {
-  item: {
-    id: string
-    providerId: string
-    bucket: string
-    key: string
-    name: string
-    type: 'file' | 'folder'
-    size?: number | null
-    mimeType?: string | null
-    uploadedAt: string
-    isCompressed?: boolean | null
-    status: string
-    errorMessage?: string | null
-  }
-  isSelected: boolean
-  onRowClick: (item: UploadHistoryRowProps['item']) => void
-  onToggleSelection: (
-    item: {
-      id: string
-      providerId: string
-      bucket: string
-      key: string
-      type: 'file' | 'folder'
-      name: string
-    },
-    checked: boolean
-  ) => void
-  onDownload: (providerId: string, bucket: string, key: string, fileName: string) => void
-  onCopyUrl: (providerId: string, bucket: string, key: string) => Promise<string>
-  onDelete: (target: {
-    id: string
-    providerId: string
-    bucket: string
-    key: string
-    type: 'file' | 'folder'
-    name: string
-  }) => void
-  isDeleting: boolean
-  renderStatusBadge: (status: string, errorMessage?: string | null) => React.ReactNode
-}
-
-function UploadHistoryRow({
-  item,
-  isSelected,
-  onRowClick,
-  onToggleSelection,
-  onDownload,
-  onCopyUrl,
-  onDelete,
-  isDeleting,
-  renderStatusBadge
-}: UploadHistoryRowProps) {
-  const { copied, copyToClipboard } = useCopyToClipboard()
-
-  const handleCopy = async () => {
-    const url = await onCopyUrl(item.providerId, item.bucket, item.key)
-    if (url) {
-      await copyToClipboard(url)
-    }
-  }
-
-  const fileIcon = getFileIcon(
-    {
-      name: item.name,
-      type: item.type as 'file' | 'folder',
-      id: item.id,
-      modified: new Date(),
-      size: item.size || 0
-    },
-    'small'
-  )
-
-  return (
-    <TableRow className="group cursor-pointer" onClick={() => onRowClick(item)}>
-      <TableCell onClick={(e) => e.stopPropagation()}>
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={(value) =>
-            onToggleSelection(
-              {
-                id: item.id,
-                providerId: item.providerId,
-                bucket: item.bucket,
-                key: item.key,
-                type: item.type,
-                name: item.name
-              },
-              value === true
-            )
-          }
-          aria-label={`Select ${item.name}`}
-        />
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-3">
-          <div className="flex-shrink-0">{fileIcon}</div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{item.name}</span>
-            {item.isCompressed && (
-              <Badge variant="secondary" className="text-xs">
-                Compressed
-              </Badge>
-            )}
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="text-muted-foreground">{item.bucket}</TableCell>
-      <TableCell className="text-muted-foreground">
-        {item.size ? formatFileSize(item.size) : '-'}
-      </TableCell>
-      <TableCell>{renderStatusBadge(item.status, item.errorMessage)}</TableCell>
-      <TableCell className="text-muted-foreground">
-        {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
-      </TableCell>
-      <TableCell onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-          {item.type === 'file' && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={() => onDownload(item.providerId, item.bucket, item.key, item.name)}
-              >
-                <IconDownload size={16} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                onClick={handleCopy}
-              >
-                {copied ? (
-                  <IconCheck size={16} className="text-green-500" />
-                ) : (
-                  <IconCopy size={16} />
-                )}
-              </Button>
-            </>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              'h-7 w-7 text-muted-foreground',
-              'hover:bg-red-50 hover:text-red-500',
-              'dark:hover:bg-red-900/20'
-            )}
-            onClick={() =>
-              onDelete({
-                id: item.id,
-                providerId: item.providerId,
-                bucket: item.bucket,
-                key: item.key,
-                type: item.type,
-                name: item.name
-              })
-            }
-            disabled={isDeleting}
-          >
-            <IconTrash size={16} />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
   )
 }

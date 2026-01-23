@@ -1,13 +1,9 @@
-import { useEffect, useState } from 'react'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   IconChevronRight,
-  IconUpload,
-  IconCopy,
-  IconCheck,
-  IconDownload
+  IconUpload
 } from '@tabler/icons-react'
-import { format } from 'date-fns'
 import { type ProviderType } from '@renderer/db'
 import { EmptyState } from '@/components/provider/empty-state'
 import { AddProviderDialog } from '@/components/provider/add-provider-dialog'
@@ -17,23 +13,12 @@ import { FileDetailSheet } from '@/components/provider/file-detail-sheet'
 import type { FileItem } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
 import { StatsGrid } from '@/components/dashboard/stats-grid'
 import { PageLayout } from '@/components/layout/page-layout'
-import { formatFileSize } from '@/lib/utils'
-import { getFileIcon } from '@/lib/file-utils'
 import { toast } from '@/hooks/use-toast'
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import { useBucketStore } from '@renderer/stores/bucket-store'
 import { DashboardSkeleton } from '@/components/ui/page-skeletons'
+import { UploadHistoryTable } from '@/components/upload-history/upload-history-table'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -61,10 +46,10 @@ function Index() {
   const showSaveDialogMutation = trpc.provider.showSaveDialog.useMutation()
   const downloadToFileMutation = trpc.provider.downloadToFile.useMutation()
 
-  // Fetch recent uploads
+  // Fetch recent uploads (limit to 10)
   const { data: recentUploads } = trpc.uploadHistory.list.useQuery({
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
     sortBy: 'uploadedAt',
     sortDirection: 'desc'
   })
@@ -150,13 +135,11 @@ function Index() {
   }
 
   const handleDownload = async (
-    e: React.MouseEvent,
     providerId: string,
     bucket: string,
     key: string,
     fileName: string
   ) => {
-    e.stopPropagation()
     try {
       const provider = await trpcUtils.provider.getById.fetch({ id: providerId })
       if (!provider) {
@@ -286,41 +269,15 @@ function Index() {
         </div>
 
         {recentUploads && recentUploads.data.length > 0 ? (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Name
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Bucket
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Size
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Uploaded
-                  </TableHead>
-                  <TableHead className="w-16" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentUploads.data.map((item) => (
-                  <RecentUploadRow
-                    key={item.id}
-                    item={{
-                      ...item,
-                      type: item.type === 'folder' ? 'folder' : 'file'
-                    }}
-                    onRowClick={handleRowClick}
-                    onDownload={handleDownload}
-                    onCopyUrl={getCopyUrl}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <UploadHistoryTable
+            data={recentUploads.data.map((item) => ({
+              ...item,
+              type: item.type as 'file' | 'folder'
+            }))}
+            onRowClick={handleRowClick}
+            onDownload={handleDownload}
+            onCopyUrl={getCopyUrl}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center rounded-md border py-16">
             <IconUpload size={48} className="mb-4 text-muted-foreground" />
@@ -347,100 +304,5 @@ function Index() {
         bucket={selectedFileDetail?.bucket ?? ''}
       />
     </PageLayout>
-  )
-}
-
-// Extract row component to use hooks
-interface RecentUploadRowProps {
-  item: {
-    id: string
-    providerId: string
-    bucket: string
-    key: string
-    name: string
-    type: 'file' | 'folder'
-    size?: number | null
-    mimeType?: string | null
-    uploadedAt: string
-    isCompressed?: boolean | null
-  }
-  onRowClick: (item: RecentUploadRowProps['item']) => void
-  onDownload: (
-    e: React.MouseEvent,
-    providerId: string,
-    bucket: string,
-    key: string,
-    fileName: string
-  ) => void
-  onCopyUrl: (providerId: string, bucket: string, key: string) => Promise<string>
-}
-
-function RecentUploadRow({ item, onRowClick, onDownload, onCopyUrl }: RecentUploadRowProps) {
-  const { copied, copyToClipboard } = useCopyToClipboard()
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const url = await onCopyUrl(item.providerId, item.bucket, item.key)
-    if (url) {
-      await copyToClipboard(url)
-    }
-  }
-
-  const fileIcon = getFileIcon(
-    {
-      name: item.name,
-      type: item.type as 'file' | 'folder',
-      id: item.id,
-      modified: new Date(),
-      size: item.size || 0
-    },
-    'small'
-  )
-
-  return (
-    <TableRow className="group cursor-pointer" onClick={() => onRowClick(item)}>
-      <TableCell>
-        <div className="flex items-center gap-3">
-          <div className="flex-shrink-0">{fileIcon}</div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium">{item.name}</span>
-            {item.isCompressed && (
-              <Badge variant="secondary" className="text-xs">
-                Compressed
-              </Badge>
-            )}
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="text-muted-foreground">{item.bucket}</TableCell>
-      <TableCell className="text-muted-foreground">
-        {item.size ? formatFileSize(item.size) : '-'}
-      </TableCell>
-      <TableCell className="text-muted-foreground">
-        {format(new Date(item.uploadedAt), 'MMM dd, yyyy HH:mm')}
-      </TableCell>
-      <TableCell>
-        {item.type === 'file' && (
-          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={(e) => onDownload(e, item.providerId, item.bucket, item.key, item.name)}
-            >
-              <IconDownload size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={handleCopy}
-            >
-              {copied ? <IconCheck size={16} className="text-green-500" /> : <IconCopy size={16} />}
-            </Button>
-          </div>
-        )}
-      </TableCell>
-    </TableRow>
   )
 }
