@@ -12,7 +12,7 @@ export const listUploadsInputSchema = z.object({
   sortBy: z.enum(['uploadedAt', 'name', 'size']).default('uploadedAt'),
   sortDirection: z.enum(['asc', 'desc']).default('desc'),
   page: z.number().min(1).default(1),
-  pageSize: z.number().min(1).max(100).default(50)
+  pageSize: z.number().min(1).max(100).default(20)
 })
 
 export const getStatsInputSchema = z.object({

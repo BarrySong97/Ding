@@ -94,7 +94,7 @@ export const uploadHistoryRepository = {
       sortBy = 'uploadedAt',
       sortDirection = 'desc',
       page = 1,
-      pageSize = 50
+      pageSize = 20
     } = params
 
     // Build where conditions

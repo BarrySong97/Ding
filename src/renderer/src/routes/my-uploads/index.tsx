@@ -74,7 +74,7 @@ function MyUploadsPage() {
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false)
   const [batchMenuOpen, setBatchMenuOpen] = useState(false)
   const [isBatchDownloading, setIsBatchDownloading] = useState(false)
-  const pageSize = 50
+  const pageSize = 20
 
   // Fetch upload history
   const { data, isLoading, isFetching, refetch } = trpc.uploadHistory.list.useQuery({
