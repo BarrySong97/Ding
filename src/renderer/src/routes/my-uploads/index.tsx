@@ -11,7 +11,6 @@ import {
   IconClock
 } from '@tabler/icons-react'
 import { trpc, type TRPCProvider } from '@renderer/lib/trpc'
-import { useDebouncedValue } from '@/hooks/use-debounce'
 import { FileDetailSheet } from '@/components/provider/file-detail-sheet'
 import type { FileItem } from '@/lib/types'
 import { toast } from '@/hooks/use-toast'
@@ -42,7 +41,7 @@ export const Route = createFileRoute('/my-uploads/')({
 
 function MyUploadsPage() {
   const [searchInput, setSearchInput] = useState('')
-  const debouncedSearch = useDebouncedValue(searchInput, 300)
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useState(1)
   // File detail drawer state
   const [fileDetailOpen, setFileDetailOpen] = useState(false)
@@ -77,15 +76,20 @@ function MyUploadsPage() {
   const pageSize = 20
 
   // Fetch upload history
-  const { data, isLoading, isFetching, refetch } = trpc.uploadHistory.list.useQuery({
-    query: debouncedSearch || undefined,
-    page,
+  const { data, isLoading, isFetching, refetch } = trpc.uploadHistory.list.useQuery(
+    {
+      query: appliedSearch || undefined,
+      page,
 
-    pageSize,
-    sortBy: 'uploadedAt',
-    sortDirection: 'desc'
-
-  })
+      pageSize,
+      sortBy: 'uploadedAt',
+      sortDirection: 'desc'
+    },
+    {
+      // Keep previous data while fetching to prevent flickering
+      placeholderData: (previousData) => previousData
+    }
+  )
 
   // Fetch statistics
   const { data: stats } = trpc.uploadHistory.getStats.useQuery({})
@@ -94,6 +98,7 @@ function MyUploadsPage() {
   const deleteObjectMutation = trpc.provider.deleteObject.useMutation({
     onSuccess: () => {
       refetch()
+      trpcUtils.provider.listObjects.invalidate()
     }
   })
   const deleteObjectsMutation = trpc.provider.deleteObjects.useMutation()
@@ -270,6 +275,7 @@ function MyUploadsPage() {
       setSelectedItems({})
       setBatchDeleteDialogOpen(false)
       refetch()
+      trpcUtils.provider.listObjects.invalidate()
     } catch (error) {
       toast({
         title: 'Delete failed',
@@ -551,11 +557,22 @@ function MyUploadsPage() {
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <Input
-                placeholder="Search by filename..."
+                placeholder="Search by filename... (press Enter)"
                 value={searchInput}
                 onChange={(e) => {
-                  setSearchInput(e.target.value)
-                  setPage(1)
+                  const nextValue = e.target.value
+                  setSearchInput(nextValue)
+                  // Clear applied search if input is cleared
+                  if (!nextValue) {
+                    setAppliedSearch('')
+                    setPage(1)
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setAppliedSearch(searchInput)
+                    setPage(1)
+                  }
                 }}
                 className="pl-9"
               />

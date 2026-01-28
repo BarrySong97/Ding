@@ -67,6 +67,7 @@ export function GlobalUploadController() {
       openWithFiles(droppedFiles, {
         onUploadComplete: () => {
           trpcUtils.provider.listObjects.invalidate()
+          trpcUtils.uploadHistory.list.invalidate()
         }
       })
     }
@@ -131,6 +132,7 @@ export function GlobalUploadController() {
     openWithFiles(droppedFiles, {
       onUploadComplete: () => {
         trpcUtils.provider.listObjects.invalidate()
+        trpcUtils.uploadHistory.list.invalidate()
       }
     })
   }

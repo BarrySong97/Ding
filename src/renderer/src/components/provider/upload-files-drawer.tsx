@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useLocalStorageState } from 'ahooks'
 import {
   IconUpload,
   IconLoader2,
@@ -41,6 +42,11 @@ import { ImageCropper } from '@/components/ui/image-cropper'
 import { FolderPickerDialog } from '@/components/provider/folder-picker-dialog'
 import { useUploadStore } from '@renderer/stores/upload-store'
 import { cn, formatFileSize } from '@/lib/utils'
+import {
+  UPLOAD_SETTINGS_KEY,
+  DEFAULT_UPLOAD_SETTINGS,
+  type UploadSettings
+} from '@renderer/routes/settings/index'
 
 interface UploadFilesDrawerProps {
   open: boolean
@@ -136,6 +142,16 @@ export function UploadFilesDrawer({
   const [selectedPrefix, setSelectedPrefix] = useState('')
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
+  // Track if we're restoring from saved settings to prevent reset effects
+  const isRestoringFromSettings = useRef(false)
+
+  // Upload settings from localStorage
+  const [uploadSettings, setUploadSettings] = useLocalStorageState<UploadSettings>(
+    UPLOAD_SETTINGS_KEY,
+    {
+      defaultValue: DEFAULT_UPLOAD_SETTINGS
+    }
+  )
 
   const isTargetLocked = lockTarget ?? Boolean(provider && bucket)
   const normalizedContextPrefix = useMemo(() => normalizePrefix(prefix), [prefix])
@@ -198,11 +214,12 @@ export function UploadFilesDrawer({
   useEffect(() => {
     if (open) {
       setKeepOriginal(false)
-      setGenerateBlurHash(false)
+      // Initialize generateBlurHash from settings
+      setGenerateBlurHash(uploadSettings?.defaultGenerateBlurhash ?? false)
       setIsUploading(false)
       setLocalMaxConcurrent(storeConcurrent) // Initialize from store
     }
-  }, [open, storeConcurrent])
+  }, [open, storeConcurrent, uploadSettings?.defaultGenerateBlurhash])
 
   useEffect(() => {
     if (!open) return
@@ -210,21 +227,43 @@ export function UploadFilesDrawer({
       setSelectedProviderId(provider?.id ?? null)
       setSelectedBucket(bucket ?? null)
       setSelectedPrefix(normalizedContextPrefix)
+      isRestoringFromSettings.current = false
       return
     }
-    setSelectedProviderId(null)
-    setSelectedBucket(null)
-    setSelectedPrefix('')
-  }, [open, isTargetLocked, provider?.id, bucket, normalizedContextPrefix])
+    // When not locked, try to restore from saved settings
+    if (uploadSettings?.rememberLastUploadTarget && uploadSettings?.lastUploadTarget) {
+      isRestoringFromSettings.current = true
+      setSelectedProviderId(uploadSettings.lastUploadTarget.providerId)
+      setSelectedBucket(uploadSettings.lastUploadTarget.bucket)
+      setSelectedPrefix(uploadSettings.lastUploadTarget.prefix)
+      // Reset the flag after a tick to allow the state to settle
+      setTimeout(() => {
+        isRestoringFromSettings.current = false
+      }, 0)
+    } else {
+      isRestoringFromSettings.current = false
+      setSelectedProviderId(null)
+      setSelectedBucket(null)
+      setSelectedPrefix('')
+    }
+  }, [
+    open,
+    isTargetLocked,
+    provider?.id,
+    bucket,
+    normalizedContextPrefix,
+    uploadSettings?.rememberLastUploadTarget,
+    uploadSettings?.lastUploadTarget
+  ])
 
   useEffect(() => {
-    if (!open || isTargetLocked) return
+    if (!open || isTargetLocked || isRestoringFromSettings.current) return
     setSelectedBucket(null)
     setSelectedPrefix('')
   }, [selectedProviderId, open, isTargetLocked])
 
   useEffect(() => {
-    if (!open || isTargetLocked) return
+    if (!open || isTargetLocked || isRestoringFromSettings.current) return
     setSelectedPrefix('')
   }, [selectedBucket, open, isTargetLocked])
 
@@ -789,6 +828,23 @@ export function UploadFilesDrawer({
 
     // Wait for all uploads to complete (with error handling)
     await Promise.allSettled(uploadPromises)
+
+    // Save last upload target if setting is enabled
+    if (uploadSettings?.rememberLastUploadTarget) {
+      setUploadSettings((prev) => ({
+        ...DEFAULT_UPLOAD_SETTINGS,
+        ...prev,
+        lastUploadTarget: {
+          providerId: target.provider.id,
+          bucket: target.bucket,
+          prefix: target.prefix ?? ''
+        }
+      }))
+    }
+
+    // Invalidate queries to refresh data
+    trpcUtils.provider.listObjects.invalidate()
+    trpcUtils.uploadHistory.list.invalidate()
 
     // Call onUploadComplete after all uploads are done
     onUploadComplete?.()

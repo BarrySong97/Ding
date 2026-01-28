@@ -1,6 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
+import { useLocalStorageState } from 'ahooks'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { IconRefresh } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
@@ -9,12 +12,33 @@ export const Route = createFileRoute('/settings/')({
   component: SettingsIndex
 })
 
+export interface UploadSettings {
+  defaultGenerateBlurhash: boolean
+  rememberLastUploadTarget: boolean
+  lastUploadTarget?: {
+    providerId: string
+    bucket: string
+    prefix: string
+  }
+}
+
+export const UPLOAD_SETTINGS_KEY = 'upload-settings'
+
+export const DEFAULT_UPLOAD_SETTINGS: UploadSettings = {
+  defaultGenerateBlurhash: false,
+  rememberLastUploadTarget: false
+}
+
 function SettingsIndex() {
   const [checking, setChecking] = useState(false)
   const [version, setVersion] = useState('...')
 
-  // 只在生产环境下显示更新功能
-  const isProduction = import.meta.env.VITE_APP_ENV === 'prod'
+  const [uploadSettings, setUploadSettings] = useLocalStorageState<UploadSettings>(
+    UPLOAD_SETTINGS_KEY,
+    {
+      defaultValue: DEFAULT_UPLOAD_SETTINGS
+    }
+  )
 
   // 获取应用版本号
   useEffect(() => {
@@ -75,6 +99,7 @@ function SettingsIndex() {
     <div>
       <h2 className="mb-4 text-2xl font-semibold">Overview</h2>
       <div className="space-y-4">
+        {/* Application Info */}
         <div className="rounded-md border border-border bg-card p-6">
           <h3 className="mb-2 font-medium">Application Info</h3>
           <div className="space-y-2 text-sm text-muted-foreground">
@@ -85,15 +110,79 @@ function SettingsIndex() {
           </div>
 
           <div className="mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCheckForUpdates}
-              disabled={checking}
-            >
+            <Button variant="outline" size="sm" onClick={handleCheckForUpdates} disabled={checking}>
               <IconRefresh className={cn('mr-2 h-4 w-4', checking && 'animate-spin')} />
               {checking ? 'Checking...' : 'Check for Updates'}
             </Button>
+          </div>
+        </div>
+
+        {/* Upload Settings */}
+        <div className="rounded-md border border-border bg-card p-6">
+          <h3 className="mb-4 font-medium">Upload Settings</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="default-blurhash" className="text-sm font-normal cursor-pointer">
+                  Default generate BlurHash
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Automatically enable BlurHash generation when uploading images
+                </p>
+              </div>
+              <Switch
+                id="default-blurhash"
+                checked={uploadSettings?.defaultGenerateBlurhash ?? false}
+                onCheckedChange={(checked) =>
+                  setUploadSettings((prev) => ({
+                    ...DEFAULT_UPLOAD_SETTINGS,
+                    ...prev,
+                    defaultGenerateBlurhash: checked
+                  }))
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label
+                  htmlFor="remember-upload-target"
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  Remember last upload target
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Remember the last used provider, bucket, and folder for uploads
+                </p>
+              </div>
+              <Switch
+                id="remember-upload-target"
+                checked={uploadSettings?.rememberLastUploadTarget ?? false}
+                onCheckedChange={(checked) =>
+                  setUploadSettings((prev) => ({
+                    ...DEFAULT_UPLOAD_SETTINGS,
+                    ...prev,
+                    rememberLastUploadTarget: checked,
+                    // Clear last target when disabling
+                    lastUploadTarget: checked ? prev?.lastUploadTarget : undefined
+                  }))
+                }
+              />
+            </div>
+
+            {uploadSettings?.rememberLastUploadTarget && uploadSettings?.lastUploadTarget && (
+              <div className="rounded-md bg-muted/50 p-3 text-sm">
+                <p className="text-muted-foreground">
+                  Last upload target:{' '}
+                  <span className="font-medium text-foreground">
+                    {uploadSettings.lastUploadTarget.bucket}
+                    {uploadSettings.lastUploadTarget.prefix
+                      ? `/${uploadSettings.lastUploadTarget.prefix.replace(/\/$/, '')}`
+                      : ''}
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

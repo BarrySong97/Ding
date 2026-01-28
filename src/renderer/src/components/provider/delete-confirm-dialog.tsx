@@ -32,6 +32,7 @@ export function DeleteConfirmDialog({
 }: DeleteConfirmDialogProps) {
   const [error, setError] = useState<string | null>(null)
 
+  const trpcUtils = trpc.useUtils()
   const deleteObjectMutation = trpc.provider.deleteObject.useMutation()
 
   const handleDelete = async () => {
@@ -48,6 +49,8 @@ export function DeleteConfirmDialog({
       })
 
       if (result.success) {
+        // Invalidate upload history to refresh data
+        trpcUtils.uploadHistory.list.invalidate()
         onSuccess?.()
         onOpenChange(false)
       } else {
