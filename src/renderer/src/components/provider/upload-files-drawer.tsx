@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useLocalStorageState } from 'ahooks'
 import {
   IconUpload,
   IconLoader2,
@@ -42,11 +41,7 @@ import { ImageCropper } from '@/components/ui/image-cropper'
 import { FolderPickerDialog } from '@/components/provider/folder-picker-dialog'
 import { useUploadStore } from '@renderer/stores/upload-store'
 import { cn, formatFileSize } from '@/lib/utils'
-import {
-  UPLOAD_SETTINGS_KEY,
-  DEFAULT_UPLOAD_SETTINGS,
-  type UploadSettings
-} from '@renderer/routes/settings/index'
+import { useUploadSettingsStore } from '@renderer/stores/upload-settings-store'
 
 interface UploadFilesDrawerProps {
   open: boolean
@@ -145,13 +140,10 @@ export function UploadFilesDrawer({
   // Track if we're restoring from saved settings to prevent reset effects
   const isRestoringFromSettings = useRef(false)
 
-  // Upload settings from localStorage
-  const [uploadSettings, setUploadSettings] = useLocalStorageState<UploadSettings>(
-    UPLOAD_SETTINGS_KEY,
-    {
-      defaultValue: DEFAULT_UPLOAD_SETTINGS
-    }
-  )
+  const defaultGenerateBlurhash = useUploadSettingsStore((state) => state.defaultGenerateBlurhash)
+  const rememberLastUploadTarget = useUploadSettingsStore((state) => state.rememberLastUploadTarget)
+  const lastUploadTarget = useUploadSettingsStore((state) => state.lastUploadTarget)
+  const setLastUploadTarget = useUploadSettingsStore((state) => state.setLastUploadTarget)
 
   const isTargetLocked = lockTarget ?? Boolean(provider && bucket)
   const normalizedContextPrefix = useMemo(() => normalizePrefix(prefix), [prefix])
@@ -215,11 +207,11 @@ export function UploadFilesDrawer({
     if (open) {
       setKeepOriginal(false)
       // Initialize generateBlurHash from settings
-      setGenerateBlurHash(uploadSettings?.defaultGenerateBlurhash ?? false)
+      setGenerateBlurHash(defaultGenerateBlurhash)
       setIsUploading(false)
       setLocalMaxConcurrent(storeConcurrent) // Initialize from store
     }
-  }, [open, storeConcurrent, uploadSettings?.defaultGenerateBlurhash])
+  }, [open, storeConcurrent, defaultGenerateBlurhash])
 
   useEffect(() => {
     if (!open) return
@@ -231,11 +223,11 @@ export function UploadFilesDrawer({
       return
     }
     // When not locked, try to restore from saved settings
-    if (uploadSettings?.rememberLastUploadTarget && uploadSettings?.lastUploadTarget) {
+    if (rememberLastUploadTarget && lastUploadTarget) {
       isRestoringFromSettings.current = true
-      setSelectedProviderId(uploadSettings.lastUploadTarget.providerId)
-      setSelectedBucket(uploadSettings.lastUploadTarget.bucket)
-      setSelectedPrefix(uploadSettings.lastUploadTarget.prefix)
+      setSelectedProviderId(lastUploadTarget.providerId)
+      setSelectedBucket(lastUploadTarget.bucket)
+      setSelectedPrefix(lastUploadTarget.prefix)
       // Reset the flag after a tick to allow the state to settle
       setTimeout(() => {
         isRestoringFromSettings.current = false
@@ -252,8 +244,8 @@ export function UploadFilesDrawer({
     provider?.id,
     bucket,
     normalizedContextPrefix,
-    uploadSettings?.rememberLastUploadTarget,
-    uploadSettings?.lastUploadTarget
+    rememberLastUploadTarget,
+    lastUploadTarget
   ])
 
   useEffect(() => {
@@ -830,16 +822,12 @@ export function UploadFilesDrawer({
     await Promise.allSettled(uploadPromises)
 
     // Save last upload target if setting is enabled
-    if (uploadSettings?.rememberLastUploadTarget) {
-      setUploadSettings((prev) => ({
-        ...DEFAULT_UPLOAD_SETTINGS,
-        ...prev,
-        lastUploadTarget: {
-          providerId: target.provider.id,
-          bucket: target.bucket,
-          prefix: target.prefix ?? ''
-        }
-      }))
+    if (rememberLastUploadTarget) {
+      setLastUploadTarget({
+        providerId: target.provider.id,
+        bucket: target.bucket,
+        prefix: target.prefix ?? ''
+      })
     }
 
     // Invalidate queries to refresh data

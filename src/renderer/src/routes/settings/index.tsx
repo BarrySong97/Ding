@@ -1,43 +1,28 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { useLocalStorageState } from 'ahooks'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { IconRefresh } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
+import { useUploadSettingsStore } from '@renderer/stores/upload-settings-store'
 
 export const Route = createFileRoute('/settings/')({
   component: SettingsIndex
 })
 
-export interface UploadSettings {
-  defaultGenerateBlurhash: boolean
-  rememberLastUploadTarget: boolean
-  lastUploadTarget?: {
-    providerId: string
-    bucket: string
-    prefix: string
-  }
-}
-
-export const UPLOAD_SETTINGS_KEY = 'upload-settings'
-
-export const DEFAULT_UPLOAD_SETTINGS: UploadSettings = {
-  defaultGenerateBlurhash: false,
-  rememberLastUploadTarget: false
-}
-
 function SettingsIndex() {
   const [checking, setChecking] = useState(false)
   const [version, setVersion] = useState('...')
-
-  const [uploadSettings, setUploadSettings] = useLocalStorageState<UploadSettings>(
-    UPLOAD_SETTINGS_KEY,
-    {
-      defaultValue: DEFAULT_UPLOAD_SETTINGS
-    }
+  const defaultGenerateBlurhash = useUploadSettingsStore((state) => state.defaultGenerateBlurhash)
+  const rememberLastUploadTarget = useUploadSettingsStore((state) => state.rememberLastUploadTarget)
+  const lastUploadTarget = useUploadSettingsStore((state) => state.lastUploadTarget)
+  const setDefaultGenerateBlurhash = useUploadSettingsStore(
+    (state) => state.setDefaultGenerateBlurhash
+  )
+  const setRememberLastUploadTarget = useUploadSettingsStore(
+    (state) => state.setRememberLastUploadTarget
   )
 
   // 获取应用版本号
@@ -132,14 +117,8 @@ function SettingsIndex() {
               </div>
               <Switch
                 id="default-blurhash"
-                checked={uploadSettings?.defaultGenerateBlurhash ?? false}
-                onCheckedChange={(checked) =>
-                  setUploadSettings((prev) => ({
-                    ...DEFAULT_UPLOAD_SETTINGS,
-                    ...prev,
-                    defaultGenerateBlurhash: checked
-                  }))
-                }
+                checked={defaultGenerateBlurhash}
+                onCheckedChange={setDefaultGenerateBlurhash}
               />
             </div>
 
@@ -157,27 +136,19 @@ function SettingsIndex() {
               </div>
               <Switch
                 id="remember-upload-target"
-                checked={uploadSettings?.rememberLastUploadTarget ?? false}
-                onCheckedChange={(checked) =>
-                  setUploadSettings((prev) => ({
-                    ...DEFAULT_UPLOAD_SETTINGS,
-                    ...prev,
-                    rememberLastUploadTarget: checked,
-                    // Clear last target when disabling
-                    lastUploadTarget: checked ? prev?.lastUploadTarget : undefined
-                  }))
-                }
+                checked={rememberLastUploadTarget}
+                onCheckedChange={setRememberLastUploadTarget}
               />
             </div>
 
-            {uploadSettings?.rememberLastUploadTarget && uploadSettings?.lastUploadTarget && (
+            {rememberLastUploadTarget && lastUploadTarget && (
               <div className="rounded-md bg-muted/50 p-3 text-sm">
                 <p className="text-muted-foreground">
                   Last upload target:{' '}
                   <span className="font-medium text-foreground">
-                    {uploadSettings.lastUploadTarget.bucket}
-                    {uploadSettings.lastUploadTarget.prefix
-                      ? `/${uploadSettings.lastUploadTarget.prefix.replace(/\/$/, '')}`
+                    {lastUploadTarget.bucket}
+                    {lastUploadTarget.prefix
+                      ? `/${lastUploadTarget.prefix.replace(/\/$/, '')}`
                       : ''}
                   </span>
                 </p>
